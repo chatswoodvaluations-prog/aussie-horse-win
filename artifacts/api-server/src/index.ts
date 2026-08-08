@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { db, tracksTable } from "@workspace/db";
-import { seed } from "./lib/seed";
+import { seed, migrateNewTracks } from "./lib/seed";
 import { schedule } from "node-cron";
 
 const rawPort = process.env["PORT"];
@@ -44,6 +44,9 @@ async function bootstrap() {
     if (tracks.length === 0) {
       logger.info("Database empty, running seed...");
       await seed();
+    } else {
+      // Existing DB: add any tracks that are in the canonical list but missing
+      await migrateNewTracks();
     }
   } catch (err) {
     logger.error({ err }, "Seed error (non-fatal)");

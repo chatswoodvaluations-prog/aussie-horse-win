@@ -1,22 +1,104 @@
 import { db, tracksTable, settingsTable, racesTable, runnersTable, nominationsTable, betResultsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { evaluateRunner, getSettings } from "./selectionEngine";
 
 const TRACKS = [
-  // Victoria
-  { name: "Bendigo", state: "VIC", type: "Regional" },
+  // Victoria — Metro
+  { name: "Flemington", state: "VIC", type: "Metro" },
+  { name: "Caulfield", state: "VIC", type: "Metro" },
+  { name: "Moonee Valley", state: "VIC", type: "Metro" },
+  { name: "Sandown", state: "VIC", type: "Metro" },
+  // Victoria — Provincial
   { name: "Geelong", state: "VIC", type: "Provincial" },
-  { name: "Wangaratta", state: "VIC", type: "Regional" },
-  { name: "Mildura", state: "VIC", type: "Regional" },
   { name: "Ballarat", state: "VIC", type: "Provincial" },
   { name: "Cranbourne", state: "VIC", type: "Provincial" },
-  // New South Wales
+  { name: "Pakenham", state: "VIC", type: "Provincial" },
+  { name: "Warrnambool", state: "VIC", type: "Provincial" },
+  // Victoria — Regional
+  { name: "Bendigo", state: "VIC", type: "Regional" },
+  { name: "Wangaratta", state: "VIC", type: "Regional" },
+  { name: "Mildura", state: "VIC", type: "Regional" },
+  { name: "Echuca", state: "VIC", type: "Regional" },
+  { name: "Seymour", state: "VIC", type: "Regional" },
+  { name: "Sale", state: "VIC", type: "Regional" },
+  { name: "Bairnsdale", state: "VIC", type: "Regional" },
+  { name: "Horsham", state: "VIC", type: "Regional" },
+  { name: "Swan Hill", state: "VIC", type: "Regional" },
+  { name: "Wodonga", state: "VIC", type: "Regional" },
+  { name: "Hamilton", state: "VIC", type: "Regional" },
+  { name: "Stawell", state: "VIC", type: "Regional" },
+  { name: "Ararat", state: "VIC", type: "Regional" },
+  { name: "Colac", state: "VIC", type: "Regional" },
+  // New South Wales — Metro
+  { name: "Randwick", state: "NSW", type: "Metro" },
+  { name: "Rosehill", state: "NSW", type: "Metro" },
+  { name: "Warwick Farm", state: "NSW", type: "Metro" },
+  { name: "Canterbury", state: "NSW", type: "Metro" },
+  // New South Wales — Provincial
+  { name: "Hawkesbury", state: "NSW", type: "Provincial" },
+  { name: "Kembla Grange", state: "NSW", type: "Provincial" },
+  { name: "Newcastle", state: "NSW", type: "Provincial" },
+  { name: "Gosford", state: "NSW", type: "Provincial" },
+  // New South Wales — Regional
   { name: "Wagga Wagga", state: "NSW", type: "Regional" },
   { name: "Dubbo", state: "NSW", type: "Regional" },
   { name: "Scone", state: "NSW", type: "Regional" },
   { name: "Albury", state: "NSW", type: "Regional" },
   { name: "Tamworth", state: "NSW", type: "Regional" },
-  { name: "Hawkesbury", state: "NSW", type: "Provincial" },
+  { name: "Muswellbrook", state: "NSW", type: "Regional" },
+  { name: "Goulburn", state: "NSW", type: "Regional" },
+  { name: "Orange", state: "NSW", type: "Regional" },
+  { name: "Bathurst", state: "NSW", type: "Regional" },
+  { name: "Grafton", state: "NSW", type: "Regional" },
+  { name: "Coffs Harbour", state: "NSW", type: "Regional" },
+  { name: "Taree", state: "NSW", type: "Regional" },
+  { name: "Port Macquarie", state: "NSW", type: "Regional" },
+  { name: "Armidale", state: "NSW", type: "Regional" },
+  { name: "Inverell", state: "NSW", type: "Regional" },
+  { name: "Nowra", state: "NSW", type: "Regional" },
+  { name: "Queanbeyan", state: "NSW", type: "Regional" },
+  { name: "Moruya", state: "NSW", type: "Regional" },
+  // Queensland — Metro
+  { name: "Eagle Farm", state: "QLD", type: "Metro" },
+  { name: "Doomben", state: "QLD", type: "Metro" },
+  // Queensland — Provincial
+  { name: "Gold Coast", state: "QLD", type: "Provincial" },
+  { name: "Sunshine Coast", state: "QLD", type: "Provincial" },
+  { name: "Toowoomba", state: "QLD", type: "Provincial" },
+  { name: "Ipswich", state: "QLD", type: "Provincial" },
+  { name: "Beaudesert", state: "QLD", type: "Provincial" },
+  // Queensland — Regional
+  { name: "Rockhampton", state: "QLD", type: "Regional" },
+  { name: "Townsville", state: "QLD", type: "Regional" },
+  { name: "Cairns", state: "QLD", type: "Regional" },
+  { name: "Mackay", state: "QLD", type: "Regional" },
+  { name: "Bundaberg", state: "QLD", type: "Regional" },
+  { name: "Gladstone", state: "QLD", type: "Regional" },
+  { name: "Dalby", state: "QLD", type: "Regional" },
+  { name: "Roma", state: "QLD", type: "Regional" },
+  // South Australia — Metro
+  { name: "Morphettville", state: "SA", type: "Metro" },
+  // South Australia — Provincial
+  { name: "Gawler", state: "SA", type: "Provincial" },
+  // South Australia — Regional
+  { name: "Murray Bridge", state: "SA", type: "Regional" },
+  { name: "Port Augusta", state: "SA", type: "Regional" },
+  { name: "Mount Gambier", state: "SA", type: "Regional" },
+  { name: "Naracoorte", state: "SA", type: "Regional" },
+  { name: "Clare", state: "SA", type: "Regional" },
+  { name: "Oakbank", state: "SA", type: "Regional" },
+  // Western Australia — Metro
+  { name: "Ascot", state: "WA", type: "Metro" },
+  { name: "Belmont", state: "WA", type: "Metro" },
+  // Western Australia — Provincial
+  { name: "Pinjarra", state: "WA", type: "Provincial" },
+  { name: "Bunbury", state: "WA", type: "Provincial" },
+  // Western Australia — Regional
+  { name: "Kalgoorlie", state: "WA", type: "Regional" },
+  { name: "Albany", state: "WA", type: "Regional" },
+  { name: "Geraldton", state: "WA", type: "Regional" },
+  { name: "Northam", state: "WA", type: "Regional" },
 ];
 
 const JOCKEYS = [
@@ -265,4 +347,54 @@ export async function seed() {
   }
 
   logger.info("Seeding complete");
+}
+
+/**
+ * Add any tracks from the canonical TRACKS list that are not yet in the
+ * database, then ensure they appear in the settings.enabledTrackIds list.
+ *
+ * Safe to run on every boot against an already-seeded database — it is a
+ * no-op when all tracks already exist.
+ */
+export async function migrateNewTracks(): Promise<void> {
+  const existingTracks = await db.select().from(tracksTable);
+
+  const existingKeys = new Set(
+    existingTracks.map((t) => `${t.name.trim().toLowerCase()}|${t.state}`)
+  );
+
+  const missing = TRACKS.filter(
+    (t) => !existingKeys.has(`${t.name.trim().toLowerCase()}|${t.state}`)
+  );
+
+  if (missing.length === 0) {
+    logger.info("migrateNewTracks: no new tracks to add");
+    return;
+  }
+
+  logger.info({ count: missing.length, tracks: missing.map((t) => t.name) }, "migrateNewTracks: inserting new tracks");
+
+  const inserted = await db.insert(tracksTable).values(missing).returning();
+
+  // Update the settings row to include the new track IDs
+  const settingsRows = await db.select().from(settingsTable).limit(1);
+  if (settingsRows.length > 0) {
+    const settings = settingsRows[0];
+    let enabledIds: number[] = [];
+    try {
+      enabledIds = JSON.parse(settings.enabledTrackIds ?? "[]");
+    } catch {
+      enabledIds = existingTracks.map((t) => t.id);
+    }
+
+    const newIds = inserted.map((t) => t.id);
+    const merged = [...new Set([...enabledIds, ...newIds])];
+
+    await db
+      .update(settingsTable)
+      .set({ enabledTrackIds: JSON.stringify(merged) })
+      .where(eq(settingsTable.id, settings.id));
+
+    logger.info({ newTrackIds: newIds }, "migrateNewTracks: settings.enabledTrackIds updated");
+  }
 }
