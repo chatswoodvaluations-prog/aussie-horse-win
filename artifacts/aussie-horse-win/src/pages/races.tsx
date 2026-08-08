@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useGetRaces, useGetNominations, useRecordResult, Race, Runner, Nomination } from '@workspace/api-client-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -149,6 +149,8 @@ function RunnerRow({ runner, nomination, raceId }: { runner: Runner; nomination?
   const [placeReturn, setPlaceReturn] = useState('');
   const recordResult = useRecordResult();
   const queryClient = useQueryClient();
+  // Guard against double-submission: tracks whether a request is already in-flight
+  const isSubmittingRef = useRef(false);
 
   const isSettled = nomination && nomination.status !== 'Pending';
 
@@ -159,12 +161,24 @@ function RunnerRow({ runner, nomination, raceId }: { runner: Runner; nomination?
       setWinReturn(nomination.projectedWinReturn.toFixed(2));
       setPlaceReturn(nomination.projectedPlaceReturn.toFixed(2));
     }
+    isSubmittingRef.current = false;
     setOpen(true);
+  };
+
+  const handleCloseDialog = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      // Reset guard when dialog closes so it's clean for next open
+      isSubmittingRef.current = false;
+    }
+    setOpen(nextOpen);
   };
 
   const handleRecordResult = (e: React.FormEvent) => {
     e.preventDefault();
     if (!finishPosition || !nomination) return;
+    // Prevent a second request racing if the first is still in-flight
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     recordResult.mutate({
       id: raceId,
@@ -176,12 +190,18 @@ function RunnerRow({ runner, nomination, raceId }: { runner: Runner; nomination?
       }
     }, {
       onSuccess: () => {
+        isSubmittingRef.current = false;
         toast.success(`Result recorded for ${runner.horseName}`);
         setOpen(false);
         queryClient.invalidateQueries();
       },
-      onError: () => {
-        toast.error('Failed to record result');
+      onError: (err: any) => {
+        isSubmittingRef.current = false;
+        if (err?.status === 409) {
+          toast.error('Another save is already in progress — please wait a moment and try again.');
+        } else {
+          toast.error('Failed to record result');
+        }
       }
     });
   };
@@ -247,7 +267,7 @@ function RunnerRow({ runner, nomination, raceId }: { runner: Runner; nomination?
       {/* Record Result button — only for nominated runners */}
       <div className="col-span-1 flex items-start justify-end pt-1">
         {nomination && (
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={handleCloseDialog}>
             <DialogTrigger asChild>
               <Button
                 variant="outline"

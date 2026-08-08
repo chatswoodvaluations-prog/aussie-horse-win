@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useGetNominations, useGetNominationsSummary, useRecordResult, NominationStatus, Nomination } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -115,6 +115,8 @@ function NominationCard({ nom }: { nom: Nomination }) {
   const [placeReturn, setPlaceReturn] = useState('');
   const recordResult = useRecordResult();
   const queryClient = useQueryClient();
+  // Guard against double-submission: tracks whether a request is already in-flight
+  const isSubmittingRef = useRef(false);
 
   const isPending = nom.status === NominationStatus.Pending;
   const isWon = nom.status === NominationStatus.Won;
@@ -132,13 +134,25 @@ function NominationCard({ nom }: { nom: Nomination }) {
     // Pre-fill returns with projected values as a starting point
     setWinReturn(nom.projectedWinReturn.toFixed(2));
     setPlaceReturn(nom.projectedPlaceReturn.toFixed(2));
+    isSubmittingRef.current = false;
     setOpen(true);
+  };
+
+  const handleCloseDialog = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      // Reset guard when dialog closes so it's clean for next open
+      isSubmittingRef.current = false;
+    }
+    setOpen(nextOpen);
   };
 
   const handleRecordResult = (e: React.FormEvent) => {
     e.preventDefault();
     if (!finishPosition) return;
-    
+    // Prevent a second request racing if the first is still in-flight
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+
     recordResult.mutate({
       id: nom.raceId,
       data: {
@@ -149,12 +163,18 @@ function NominationCard({ nom }: { nom: Nomination }) {
       }
     }, {
       onSuccess: () => {
+        isSubmittingRef.current = false;
         toast.success(`Result recorded for ${nom.horseName}`);
         setOpen(false);
         queryClient.invalidateQueries();
       },
-      onError: () => {
-        toast.error('Failed to record result');
+      onError: (err: any) => {
+        isSubmittingRef.current = false;
+        if (err?.status === 409) {
+          toast.error('Another save is already in progress — please wait a moment and try again.');
+        } else {
+          toast.error('Failed to record result');
+        }
       }
     });
   };
@@ -173,7 +193,7 @@ function NominationCard({ nom }: { nom: Nomination }) {
             </Badge>
 
             {/* SETTLE for pending, EDIT RESULT for settled */}
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={handleCloseDialog}>
               <DialogTrigger asChild>
                 <Button
                   variant="outline"

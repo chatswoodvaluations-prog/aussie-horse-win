@@ -5,6 +5,9 @@ import { GetRacesResponse, GetRaceResponse, GetRaceParams, RecordResultParams, R
 
 const router = Router();
 
+// Tracks nominationIds currently being processed to prevent concurrent duplicate writes
+const inProgressNominationIds = new Set<number>();
+
 function buildRaceResponse(race: typeof racesTable.$inferSelect, runners: typeof runnersTable.$inferSelect[]) {
   const qualifiedCount = runners.filter((r) => r.passed).length;
   return {
@@ -101,6 +104,14 @@ router.post("/races/:id/result", async (req, res): Promise<void> => {
   }
   const nomination = nominations[0];
 
+  // Guard against concurrent duplicate writes for the same nomination
+  if (inProgressNominationIds.has(nomination.id)) {
+    res.status(409).json({ error: "A result for this nomination is already being recorded. Please wait and try again." });
+    return;
+  }
+  inProgressNominationIds.add(nomination.id);
+
+  try {
   // Determine outcome
   let outcome: string;
   let status: string;
@@ -175,7 +186,10 @@ router.post("/races/:id/result", async (req, res): Promise<void> => {
     outcome: betResult.outcome as "Won" | "Placed" | "Unplaced",
   };
 
-  res.json(RecordResultResponse.parse(result));
+    res.json(RecordResultResponse.parse(result));
+  } finally {
+    inProgressNominationIds.delete(nomination.id);
+  }
 });
 
 export default router;
