@@ -42,7 +42,9 @@ function getProxyAgent(): SocksProxyAgent | null {
     return null;
   }
 
-  const proxyUrl = `socks5://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
+  // socks5h = DNS resolved by the proxy server, not locally.
+  // Required when the host machine can't resolve AU-only domains.
+  const proxyUrl = `socks5h://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
   _agent = new SocksProxyAgent(proxyUrl);
   logger.info({ host, port }, "TAB proxy: SOCKS5 agent initialised");
   return _agent;
