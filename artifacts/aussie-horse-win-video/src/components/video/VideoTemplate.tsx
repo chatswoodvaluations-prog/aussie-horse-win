@@ -72,7 +72,7 @@ export default function VideoTemplate({
 
   return (
     <div
-      className="w-full h-screen overflow-hidden relative"
+      className="w-full h-full overflow-hidden relative"
       style={{ backgroundColor: 'var(--color-bg-dark)' }}
     >
       <AnimatePresence mode="popLayout">
