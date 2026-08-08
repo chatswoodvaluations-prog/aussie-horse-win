@@ -1,14 +1,32 @@
 import { useState, useMemo } from 'react';
-import { useGetRaces, Race, Runner } from '@workspace/api-client-react';
+import { useGetRaces, useGetNominations, useRecordResult, Race, Runner, Nomination } from '@workspace/api-client-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle2, XCircle, ChevronDown, User, MapPin } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { CheckCircle2, XCircle, User, MapPin, CheckSquare, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function RacesExplorer() {
-  const { data: races, isLoading } = useGetRaces();
+  const { data: races, isLoading: isRacesLoading } = useGetRaces();
+  const { data: nominations, isLoading: isNomsLoading } = useGetNominations();
+
+  const isLoading = isRacesLoading || isNomsLoading;
+
+  // Build a lookup: runnerId → nomination
+  const nominationByRunnerId = useMemo(() => {
+    const map = new Map<number, Nomination>();
+    for (const nom of nominations ?? []) {
+      map.set(nom.runnerId, nom);
+    }
+    return map;
+  }, [nominations]);
 
   if (isLoading) {
     return (
@@ -46,14 +64,14 @@ export default function RacesExplorer() {
 
       <Accordion type="multiple" className="space-y-3">
         {races.map((race) => (
-          <RaceRow key={race.id} race={race} />
+          <RaceRow key={race.id} race={race} nominationByRunnerId={nominationByRunnerId} />
         ))}
       </Accordion>
     </div>
   );
 }
 
-function RaceRow({ race }: { race: Race }) {
+function RaceRow({ race, nominationByRunnerId }: { race: Race; nominationByRunnerId: Map<number, Nomination> }) {
   const isSelected = race.qualifiedCount > 0;
   
   return (
@@ -105,12 +123,18 @@ function RaceRow({ race }: { race: Race }) {
             <div className="col-span-3">Runner</div>
             <div className="col-span-2">Map</div>
             <div className="col-span-2">Odds (W/P)</div>
-            <div className="col-span-4">Filter Evaluation</div>
+            <div className="col-span-3">Filter Evaluation</div>
+            <div className="col-span-1"></div>
           </div>
           
           {/* Table Body */}
           {race.runners.map((runner) => (
-            <RunnerRow key={runner.id} runner={runner} />
+            <RunnerRow
+              key={runner.id}
+              runner={runner}
+              nomination={nominationByRunnerId.get(runner.id)}
+              raceId={race.id}
+            />
           ))}
         </div>
       </AccordionContent>
@@ -118,7 +142,58 @@ function RaceRow({ race }: { race: Race }) {
   );
 }
 
-function RunnerRow({ runner }: { runner: Runner }) {
+function RunnerRow({ runner, nomination, raceId }: { runner: Runner; nomination?: Nomination; raceId: number }) {
+  const [open, setOpen] = useState(false);
+  const [finishPosition, setFinishPosition] = useState('');
+  const [winReturn, setWinReturn] = useState('');
+  const [placeReturn, setPlaceReturn] = useState('');
+  const recordResult = useRecordResult();
+  const queryClient = useQueryClient();
+
+  const isSettled = nomination && nomination.status !== 'Pending';
+
+  const openDialog = () => {
+    if (nomination) {
+      // Pre-fill with existing actuals (for edit) or projected returns (for first entry)
+      setFinishPosition('');
+      setWinReturn(nomination.projectedWinReturn.toFixed(2));
+      setPlaceReturn(nomination.projectedPlaceReturn.toFixed(2));
+    }
+    setOpen(true);
+  };
+
+  const handleRecordResult = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!finishPosition || !nomination) return;
+
+    recordResult.mutate({
+      id: raceId,
+      data: {
+        runnerId: runner.id,
+        finishPosition: parseInt(finishPosition),
+        actualWinReturn: winReturn ? parseFloat(winReturn) : null,
+        actualPlaceReturn: placeReturn ? parseFloat(placeReturn) : null,
+      }
+    }, {
+      onSuccess: () => {
+        toast.success(`Result recorded for ${runner.horseName}`);
+        setOpen(false);
+        queryClient.invalidateQueries();
+      },
+      onError: () => {
+        toast.error('Failed to record result');
+      }
+    });
+  };
+
+  const statusColor = nomination?.status === 'Won'
+    ? 'bg-primary text-primary-foreground'
+    : nomination?.status === 'Placed'
+    ? 'bg-primary/40 text-primary-foreground'
+    : nomination?.status === 'Unplaced'
+    ? 'bg-destructive text-destructive-foreground'
+    : '';
+
   return (
     <div className={cn(
       "grid grid-cols-12 gap-4 px-6 py-4 items-start text-sm transition-colors hover:bg-secondary/20",
@@ -151,7 +226,7 @@ function RunnerRow({ runner }: { runner: Runner }) {
         <span className="text-muted-foreground text-xs">/ ${runner.placeOdds.toFixed(2)}</span>
       </div>
       
-      <div className="col-span-4 space-y-1.5">
+      <div className="col-span-3 space-y-1.5">
         {runner.filterResults.map((result, idx) => (
           <div key={idx} className="flex items-start gap-2 text-xs font-mono">
             {result.passed ? (
@@ -166,6 +241,110 @@ function RunnerRow({ runner }: { runner: Runner }) {
         ))}
         {runner.filterResults.length === 0 && (
           <span className="text-muted-foreground italic text-xs">No filters evaluated</span>
+        )}
+      </div>
+
+      {/* Record Result button — only for nominated runners */}
+      <div className="col-span-1 flex items-start justify-end pt-1">
+        {nomination && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openDialog}
+                className={cn(
+                  "h-7 text-[10px] font-mono px-2",
+                  isSettled
+                    ? "border-border text-muted-foreground hover:bg-secondary"
+                    : "border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
+                )}
+              >
+                {isSettled ? (
+                  <>
+                    <Pencil className="size-3 mr-1" />
+                    EDIT
+                  </>
+                ) : (
+                  <>
+                    <CheckSquare className="size-3 mr-1" />
+                    SETTLE
+                  </>
+                )}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="font-mono flex items-center gap-2">
+                  <CheckSquare className="size-5 text-primary" />
+                  {isSettled ? 'Edit Result' : 'Record Result'}: {runner.horseName}
+                </DialogTitle>
+              </DialogHeader>
+              {nomination && (
+                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground bg-secondary/30 px-3 py-2 rounded border border-border/50">
+                  <span className="uppercase tracking-wider">{nomination.trackName}</span>
+                  <span>·</span>
+                  <span>R{nomination.raceNumber}</span>
+                  {isSettled && (
+                    <>
+                      <span>·</span>
+                      <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5 font-mono border-0", statusColor)}>
+                        {nomination.status}
+                      </Badge>
+                    </>
+                  )}
+                </div>
+              )}
+              <form onSubmit={handleRecordResult} className="space-y-4 mt-2">
+                <div className="space-y-2">
+                  <Label className="font-mono text-xs text-muted-foreground uppercase">Finish Position</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    required
+                    value={finishPosition}
+                    onChange={e => setFinishPosition(e.target.value)}
+                    className="font-mono bg-background text-lg font-bold"
+                    placeholder="e.g. 1"
+                    autoFocus
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs text-muted-foreground uppercase">Actual Win Return</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono">$</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={winReturn}
+                        onChange={e => setWinReturn(e.target.value)}
+                        className="font-mono bg-background pl-7"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs text-muted-foreground uppercase">Actual Place Return</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono">$</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={placeReturn}
+                        onChange={e => setPlaceReturn(e.target.value)}
+                        className="font-mono bg-background pl-7"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-border flex justify-end">
+                  <Button type="submit" className="font-mono font-bold" disabled={recordResult.isPending}>
+                    {recordResult.isPending ? 'SAVING...' : isSettled ? 'UPDATE RESULT' : 'CONFIRM RESULT'}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </div>

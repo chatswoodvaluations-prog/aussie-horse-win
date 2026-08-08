@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare } from 'lucide-react';
+import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Nominations() {
@@ -120,11 +120,20 @@ function NominationCard({ nom }: { nom: Nomination }) {
   const isWon = nom.status === NominationStatus.Won;
   const isPlaced = nom.status === NominationStatus.Placed;
   const isUnplaced = nom.status === NominationStatus.Unplaced;
+  const isSettled = !isPending;
 
   const statusColor = isWon ? 'bg-primary/20 text-primary border-primary/50 shadow-[0_0_10px_rgba(0,255,102,0.1)]' 
     : isPlaced ? 'bg-primary/10 text-primary/80 border-primary/30'
     : isUnplaced ? 'bg-destructive/10 text-destructive border-destructive/30'
     : 'bg-amber-500/10 text-amber-500 border-amber-500/30';
+
+  const openDialog = () => {
+    setFinishPosition('');
+    // Pre-fill returns with projected values as a starting point
+    setWinReturn(nom.projectedWinReturn.toFixed(2));
+    setPlaceReturn(nom.projectedPlaceReturn.toFixed(2));
+    setOpen(true);
+  };
 
   const handleRecordResult = (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,73 +171,91 @@ function NominationCard({ nom }: { nom: Nomination }) {
             <Badge variant="outline" className={cn("font-mono text-[10px] uppercase", statusColor)}>
               {nom.status}
             </Badge>
-            {isPending && (
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-6 text-[10px] font-mono border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground">
-                    <CheckSquare className="size-3 mr-1" />
-                    SETTLE
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md bg-card border-border">
-                  <DialogHeader>
-                    <DialogTitle className="font-mono flex items-center gap-2">
-                      <CheckSquare className="size-5 text-primary" />
-                      Settle Bet: {nom.horseName}
-                    </DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleRecordResult} className="space-y-4 mt-4">
+
+            {/* SETTLE for pending, EDIT RESULT for settled */}
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openDialog}
+                  className={cn(
+                    "h-6 text-[10px] font-mono",
+                    isPending
+                      ? "border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
+                      : "border-border text-muted-foreground hover:bg-secondary"
+                  )}
+                >
+                  {isPending ? (
+                    <>
+                      <CheckSquare className="size-3 mr-1" />
+                      SETTLE
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="size-3 mr-1" />
+                      EDIT
+                    </>
+                  )}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md bg-card border-border">
+                <DialogHeader>
+                  <DialogTitle className="font-mono flex items-center gap-2">
+                    <CheckSquare className="size-5 text-primary" />
+                    {isSettled ? 'Edit Result' : 'Settle Bet'}: {nom.horseName}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleRecordResult} className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs text-muted-foreground uppercase">Finish Position</Label>
+                    <Input 
+                      type="number" 
+                      min="1" 
+                      required 
+                      value={finishPosition} 
+                      onChange={e => setFinishPosition(e.target.value)} 
+                      className="font-mono bg-background text-lg font-bold"
+                      placeholder="e.g. 1"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="font-mono text-xs text-muted-foreground uppercase">Finish Position</Label>
-                      <Input 
-                        type="number" 
-                        min="1" 
-                        required 
-                        value={finishPosition} 
-                        onChange={e => setFinishPosition(e.target.value)} 
-                        className="font-mono bg-background text-lg font-bold"
-                        placeholder="e.g. 1"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="font-mono text-xs text-muted-foreground uppercase">Actual Win Return</Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono">$</span>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            value={winReturn} 
-                            onChange={e => setWinReturn(e.target.value)} 
-                            className="font-mono bg-background pl-7"
-                            placeholder={nom.projectedWinReturn.toFixed(2)}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="font-mono text-xs text-muted-foreground uppercase">Actual Place Return</Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono">$</span>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            value={placeReturn} 
-                            onChange={e => setPlaceReturn(e.target.value)} 
-                            className="font-mono bg-background pl-7"
-                            placeholder={nom.projectedPlaceReturn.toFixed(2)}
-                          />
-                        </div>
+                      <Label className="font-mono text-xs text-muted-foreground uppercase">Actual Win Return</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono">$</span>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          value={winReturn} 
+                          onChange={e => setWinReturn(e.target.value)} 
+                          className="font-mono bg-background pl-7"
+                        />
                       </div>
                     </div>
-                    <div className="pt-4 border-t border-border flex justify-end">
-                      <Button type="submit" className="font-mono font-bold" disabled={recordResult.isPending}>
-                        {recordResult.isPending ? 'SAVING...' : 'CONFIRM RESULT'}
-                      </Button>
+                    <div className="space-y-2">
+                      <Label className="font-mono text-xs text-muted-foreground uppercase">Actual Place Return</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono">$</span>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          value={placeReturn} 
+                          onChange={e => setPlaceReturn(e.target.value)} 
+                          className="font-mono bg-background pl-7"
+                        />
+                      </div>
                     </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )}
+                  </div>
+                  <div className="pt-4 border-t border-border flex justify-end">
+                    <Button type="submit" className="font-mono font-bold" disabled={recordResult.isPending}>
+                      {recordResult.isPending ? 'SAVING...' : isSettled ? 'UPDATE RESULT' : 'CONFIRM RESULT'}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
           <div className="flex justify-between items-start">
             <div>

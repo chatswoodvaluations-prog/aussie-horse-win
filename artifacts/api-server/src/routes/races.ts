@@ -119,24 +119,39 @@ router.post("/races/:id/result", async (req, res): Promise<void> => {
   const placeReturn = actualPlaceReturn ?? 0;
   const netResult = winReturn + placeReturn - nomination.totalOutlay;
 
-  // Insert bet result
-  const [betResult] = await db.insert(betResultsTable).values({
-    nominationId: nomination.id,
-    raceId,
-    runnerId,
-    trackName: race.trackName,
-    raceDate: race.raceDate,
-    horseName: nomination.horseName,
-    finishPosition,
-    fieldSize: race.fieldSize,
-    winStake: nomination.winStake,
-    placeStake: nomination.placeStake,
-    totalOutlay: nomination.totalOutlay,
-    actualWinReturn: actualWinReturn ?? null,
-    actualPlaceReturn: actualPlaceReturn ?? null,
-    netResult,
-    outcome,
-  }).returning();
+  // Upsert bet result — update if already exists for this nomination, insert otherwise
+  const existing = await db.select().from(betResultsTable).where(eq(betResultsTable.nominationId, nomination.id));
+
+  let betResult: typeof betResultsTable.$inferSelect;
+  if (existing.length > 0) {
+    const [updated] = await db.update(betResultsTable).set({
+      finishPosition,
+      actualWinReturn: actualWinReturn ?? null,
+      actualPlaceReturn: actualPlaceReturn ?? null,
+      netResult,
+      outcome,
+    }).where(eq(betResultsTable.nominationId, nomination.id)).returning();
+    betResult = updated;
+  } else {
+    const [inserted] = await db.insert(betResultsTable).values({
+      nominationId: nomination.id,
+      raceId,
+      runnerId,
+      trackName: race.trackName,
+      raceDate: race.raceDate,
+      horseName: nomination.horseName,
+      finishPosition,
+      fieldSize: race.fieldSize,
+      winStake: nomination.winStake,
+      placeStake: nomination.placeStake,
+      totalOutlay: nomination.totalOutlay,
+      actualWinReturn: actualWinReturn ?? null,
+      actualPlaceReturn: actualPlaceReturn ?? null,
+      netResult,
+      outcome,
+    }).returning();
+    betResult = inserted;
+  }
 
   // Update nomination status
   await db.update(nominationsTable).set({ status }).where(eq(nominationsTable.id, nomination.id));
