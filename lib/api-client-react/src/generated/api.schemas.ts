@@ -93,6 +93,18 @@ export const NominationStatus = {
   Unplaced: 'Unplaced',
 } as const;
 
+/**
+ * Whether odds came from the live TAB feed ("live") or the mock generator ("mock")
+ * @nullable
+ */
+export type NominationDataSource = typeof NominationDataSource[keyof typeof NominationDataSource] | null;
+
+
+export const NominationDataSource = {
+  live: 'live',
+  mock: 'mock',
+} as const;
+
 export interface Nomination {
   id: number;
   raceId: number;
@@ -120,6 +132,11 @@ export interface Nomination {
   /** @nullable */
   trainer?: string | null;
   status: NominationStatus;
+  /**
+     * Whether odds came from the live TAB feed ("live") or the mock generator ("mock")
+     * @nullable
+     */
+  dataSource?: NominationDataSource;
 }
 
 export type NominationSummaryByTrackItem = {

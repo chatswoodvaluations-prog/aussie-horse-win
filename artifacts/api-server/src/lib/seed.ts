@@ -201,6 +201,7 @@ export async function seed() {
           raceTime,
           fieldSize,
           distance,
+          dataSource: "mock",
         }).returning();
 
         raceIdCounter++;

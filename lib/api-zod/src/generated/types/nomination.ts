@@ -5,6 +5,7 @@
  * Aussie Horse Win API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { NominationDataSource } from './nominationDataSource';
 import type { NominationStatus } from './nominationStatus';
 
 export interface Nomination {
@@ -34,4 +35,9 @@ export interface Nomination {
   /** @nullable */
   trainer?: string | null;
   status: NominationStatus;
+  /**
+     * Whether odds came from the live TAB feed ("live") or the mock generator ("mock")
+     * @nullable
+     */
+  dataSource?: NominationDataSource;
 }

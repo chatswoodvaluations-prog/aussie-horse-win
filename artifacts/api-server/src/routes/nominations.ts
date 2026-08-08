@@ -1,34 +1,41 @@
 import { Router } from "express";
-import { db, nominationsTable } from "@workspace/db";
+import { db, nominationsTable, racesTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { GetNominationsResponse, GetNominationsSummaryResponse } from "@workspace/api-zod";
 
 const router = Router();
 
 router.get("/nominations", async (req, res): Promise<void> => {
-  const nominations = await db.select().from(nominationsTable).orderBy(nominationsTable.raceDate, nominationsTable.raceNumber);
-  res.json(GetNominationsResponse.parse(nominations.map((n) => ({
-    id: n.id,
-    raceId: n.raceId,
-    runnerId: n.runnerId,
-    trackName: n.trackName,
-    state: n.state,
-    raceNumber: n.raceNumber,
-    raceName: n.raceName ?? null,
-    raceDate: n.raceDate,
-    raceTime: n.raceTime ?? null,
-    horseName: n.horseName,
-    barrierNumber: n.barrierNumber,
-    speedMapPosition: n.speedMapPosition,
-    winOdds: n.winOdds,
-    placeOdds: n.placeOdds,
-    winStake: n.winStake,
-    placeStake: n.placeStake,
-    totalOutlay: n.totalOutlay,
-    projectedWinReturn: n.projectedWinReturn,
-    projectedPlaceReturn: n.projectedPlaceReturn,
-    jockey: n.jockey ?? null,
-    trainer: n.trainer ?? null,
-    status: n.status as "Pending" | "Won" | "Placed" | "Unplaced",
+  const rows = await db
+    .select()
+    .from(nominationsTable)
+    .leftJoin(racesTable, eq(nominationsTable.raceId, racesTable.id))
+    .orderBy(nominationsTable.raceDate, nominationsTable.raceNumber);
+
+  res.json(GetNominationsResponse.parse(rows.map(({ nominations, races }) => ({
+    id: nominations.id,
+    raceId: nominations.raceId,
+    runnerId: nominations.runnerId,
+    trackName: nominations.trackName,
+    state: nominations.state,
+    raceNumber: nominations.raceNumber,
+    raceName: nominations.raceName ?? null,
+    raceDate: nominations.raceDate,
+    raceTime: nominations.raceTime ?? null,
+    horseName: nominations.horseName,
+    barrierNumber: nominations.barrierNumber,
+    speedMapPosition: nominations.speedMapPosition,
+    winOdds: nominations.winOdds,
+    placeOdds: nominations.placeOdds,
+    winStake: nominations.winStake,
+    placeStake: nominations.placeStake,
+    totalOutlay: nominations.totalOutlay,
+    projectedWinReturn: nominations.projectedWinReturn,
+    projectedPlaceReturn: nominations.projectedPlaceReturn,
+    jockey: nominations.jockey ?? null,
+    trainer: nominations.trainer ?? null,
+    status: nominations.status as "Pending" | "Won" | "Placed" | "Unplaced",
+    dataSource: races?.dataSource ?? null,
   }))));
 });
 

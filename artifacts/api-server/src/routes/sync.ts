@@ -129,6 +129,7 @@ async function insertLiveRaceCards(
             raceTime: race.raceTime,
             fieldSize: race.fieldSize,
             distance: race.distance,
+            dataSource: "live",
           })
           .where(eq(racesTable.id, raceId));
 
@@ -183,6 +184,7 @@ async function insertLiveRaceCards(
             raceTime: race.raceTime,
             fieldSize: race.fieldSize,
             distance: race.distance,
+            dataSource: "live",
           })
           .returning();
 
@@ -251,6 +253,7 @@ async function insertMockRaceCards(
             raceTime,
             fieldSize,
             distance,
+            dataSource: "mock",
           })
           .returning();
 

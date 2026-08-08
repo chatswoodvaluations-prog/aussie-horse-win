@@ -13,6 +13,7 @@ export const racesTable = pgTable("races", {
   raceTime: text("race_time"),
   fieldSize: integer("field_size").notNull(),
   distance: integer("distance"),
+  dataSource: text("data_source").$type<"live" | "mock">(),
 });
 
 export const insertRaceSchema = createInsertSchema(racesTable).omit({ id: true });

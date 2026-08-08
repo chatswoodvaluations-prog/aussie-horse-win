@@ -5,7 +5,7 @@
  * Aussie Horse Win API specification
  * OpenAPI spec version: 0.1.0
  */
-import * as zod from 'zod';
+import * as zod from 'zod/v4';
 
 
 /**
@@ -22,17 +22,17 @@ export const HealthCheckResponse = zod.object({
  * @summary Get weekly nominations
  */
 export const GetNominationsResponseItem = zod.object({
-  "id": zod.number().int(),
-  "raceId": zod.number().int(),
-  "runnerId": zod.number().int(),
+  "id": zod.int(),
+  "raceId": zod.int(),
+  "runnerId": zod.int(),
   "trackName": zod.string(),
   "state": zod.string(),
-  "raceNumber": zod.number().int(),
+  "raceNumber": zod.int(),
   "raceName": zod.string().nullish(),
   "raceDate": zod.string(),
   "raceTime": zod.string().nullish(),
   "horseName": zod.string(),
-  "barrierNumber": zod.number().int(),
+  "barrierNumber": zod.int(),
   "speedMapPosition": zod.string(),
   "winOdds": zod.number(),
   "placeOdds": zod.number(),
@@ -43,7 +43,8 @@ export const GetNominationsResponseItem = zod.object({
   "projectedPlaceReturn": zod.number(),
   "jockey": zod.string().nullish(),
   "trainer": zod.string().nullish(),
-  "status": zod.enum(['Pending', 'Won', 'Placed', 'Unplaced'])
+  "status": zod.enum(['Pending', 'Won', 'Placed', 'Unplaced']),
+  "dataSource": zod.union([zod.literal('live'),zod.literal('mock'),zod.literal(null)]).nullish().describe('Whether odds came from the live TAB feed (\"live\") or the mock generator (\"mock\")')
 })
 export const GetNominationsResponse = zod.array(GetNominationsResponseItem)
 
@@ -53,20 +54,20 @@ export const GetNominationsResponse = zod.array(GetNominationsResponseItem)
  * @summary Get nominations summary stats
  */
 export const GetNominationsSummaryResponse = zod.object({
-  "totalNominations": zod.number().int(),
+  "totalNominations": zod.int(),
   "totalOutlay": zod.number(),
   "byTrack": zod.array(zod.object({
   "trackName": zod.string(),
-  "count": zod.number().int()
+  "count": zod.int()
 })),
   "byState": zod.array(zod.object({
   "state": zod.string(),
-  "count": zod.number().int()
+  "count": zod.int()
 })),
-  "pendingCount": zod.number().int(),
-  "wonCount": zod.number().int(),
-  "placedCount": zod.number().int(),
-  "unplacedCount": zod.number().int()
+  "pendingCount": zod.int(),
+  "wonCount": zod.int(),
+  "placedCount": zod.int(),
+  "unplacedCount": zod.int()
 })
 
 
@@ -75,20 +76,20 @@ export const GetNominationsSummaryResponse = zod.object({
  * @summary Get all upcoming races with filter evaluation
  */
 export const GetRacesResponseItem = zod.object({
-  "id": zod.number().int(),
+  "id": zod.int(),
   "trackName": zod.string(),
   "state": zod.string(),
-  "raceNumber": zod.number().int(),
+  "raceNumber": zod.int(),
   "raceName": zod.string().nullish(),
   "raceDate": zod.string(),
   "raceTime": zod.string().nullish(),
-  "fieldSize": zod.number().int(),
-  "distance": zod.number().int().nullish(),
+  "fieldSize": zod.int(),
+  "distance": zod.int().nullish(),
   "runners": zod.array(zod.object({
-  "id": zod.number().int(),
-  "raceId": zod.number().int(),
+  "id": zod.int(),
+  "raceId": zod.int(),
   "horseName": zod.string(),
-  "barrierNumber": zod.number().int(),
+  "barrierNumber": zod.int(),
   "speedMapPosition": zod.enum(['Lead', 'On-Pace', 'Handy', 'Midfield', 'Back-Marker']),
   "winOdds": zod.number(),
   "placeOdds": zod.number(),
@@ -101,7 +102,7 @@ export const GetRacesResponseItem = zod.object({
   "message": zod.string()
 }))
 })),
-  "qualifiedCount": zod.number().int()
+  "qualifiedCount": zod.int()
 })
 export const GetRacesResponse = zod.array(GetRacesResponseItem)
 
@@ -114,20 +115,20 @@ export const GetRaceParams = zod.object({
 })
 
 export const GetRaceResponse = zod.object({
-  "id": zod.number().int(),
+  "id": zod.int(),
   "trackName": zod.string(),
   "state": zod.string(),
-  "raceNumber": zod.number().int(),
+  "raceNumber": zod.int(),
   "raceName": zod.string().nullish(),
   "raceDate": zod.string(),
   "raceTime": zod.string().nullish(),
-  "fieldSize": zod.number().int(),
-  "distance": zod.number().int().nullish(),
+  "fieldSize": zod.int(),
+  "distance": zod.int().nullish(),
   "runners": zod.array(zod.object({
-  "id": zod.number().int(),
-  "raceId": zod.number().int(),
+  "id": zod.int(),
+  "raceId": zod.int(),
   "horseName": zod.string(),
-  "barrierNumber": zod.number().int(),
+  "barrierNumber": zod.int(),
   "speedMapPosition": zod.enum(['Lead', 'On-Pace', 'Handy', 'Midfield', 'Back-Marker']),
   "winOdds": zod.number(),
   "placeOdds": zod.number(),
@@ -140,7 +141,7 @@ export const GetRaceResponse = zod.object({
   "message": zod.string()
 }))
 })),
-  "qualifiedCount": zod.number().int()
+  "qualifiedCount": zod.int()
 })
 
 
@@ -152,22 +153,22 @@ export const RecordResultParams = zod.object({
 })
 
 export const RecordResultBody = zod.object({
-  "runnerId": zod.number().int(),
-  "finishPosition": zod.number().int(),
+  "runnerId": zod.int(),
+  "finishPosition": zod.int(),
   "actualWinReturn": zod.number().nullish(),
   "actualPlaceReturn": zod.number().nullish()
 })
 
 export const RecordResultResponse = zod.object({
-  "id": zod.number().int(),
-  "nominationId": zod.number().int(),
-  "raceId": zod.number().int(),
-  "runnerId": zod.number().int(),
+  "id": zod.int(),
+  "nominationId": zod.int(),
+  "raceId": zod.int(),
+  "runnerId": zod.int(),
   "trackName": zod.string(),
   "raceDate": zod.string(),
   "horseName": zod.string(),
-  "finishPosition": zod.number().int(),
-  "fieldSize": zod.number().int(),
+  "finishPosition": zod.int(),
+  "fieldSize": zod.int(),
   "winStake": zod.number(),
   "placeStake": zod.number(),
   "totalOutlay": zod.number(),
@@ -182,14 +183,14 @@ export const RecordResultResponse = zod.object({
  * @summary Get current filter settings
  */
 export const GetSettingsResponse = zod.object({
-  "fieldSizeMin": zod.number().int(),
-  "fieldSizeMax": zod.number().int(),
+  "fieldSizeMin": zod.int(),
+  "fieldSizeMax": zod.int(),
   "minWinOdds": zod.number(),
   "maxWinOdds": zod.number(),
   "minPlaceOdds": zod.number(),
   "winStake": zod.number(),
   "placeStake": zod.number(),
-  "enabledTrackIds": zod.array(zod.number().int()),
+  "enabledTrackIds": zod.array(zod.int()),
   "notificationEmail": zod.string().nullish().describe('Email address to notify when new qualifying selections are found')
 })
 
@@ -198,26 +199,26 @@ export const GetSettingsResponse = zod.object({
  * @summary Update filter settings
  */
 export const UpdateSettingsBody = zod.object({
-  "fieldSizeMin": zod.number().int().optional(),
-  "fieldSizeMax": zod.number().int().optional(),
+  "fieldSizeMin": zod.int().optional(),
+  "fieldSizeMax": zod.int().optional(),
   "minWinOdds": zod.number().optional(),
   "maxWinOdds": zod.number().optional(),
   "minPlaceOdds": zod.number().optional(),
   "winStake": zod.number().optional(),
   "placeStake": zod.number().optional(),
-  "enabledTrackIds": zod.array(zod.number().int()).optional(),
+  "enabledTrackIds": zod.array(zod.int()).optional(),
   "notificationEmail": zod.string().nullish().describe('Email address to notify when new qualifying selections are found')
 })
 
 export const UpdateSettingsResponse = zod.object({
-  "fieldSizeMin": zod.number().int(),
-  "fieldSizeMax": zod.number().int(),
+  "fieldSizeMin": zod.int(),
+  "fieldSizeMax": zod.int(),
   "minWinOdds": zod.number(),
   "maxWinOdds": zod.number(),
   "minPlaceOdds": zod.number(),
   "winStake": zod.number(),
   "placeStake": zod.number(),
-  "enabledTrackIds": zod.array(zod.number().int()),
+  "enabledTrackIds": zod.array(zod.int()),
   "notificationEmail": zod.string().nullish().describe('Email address to notify when new qualifying selections are found')
 })
 
@@ -226,7 +227,7 @@ export const UpdateSettingsResponse = zod.object({
  * @summary Get all tracks with enabled/disabled status
  */
 export const GetTracksResponseItem = zod.object({
-  "id": zod.number().int(),
+  "id": zod.int(),
   "name": zod.string(),
   "state": zod.enum(['VIC', 'NSW']),
   "type": zod.enum(['Regional', 'Provincial']),
@@ -240,7 +241,7 @@ export const GetTracksResponse = zod.array(GetTracksResponseItem)
  * @summary Get overall performance metrics
  */
 export const GetPerformanceResponse = zod.object({
-  "totalBets": zod.number().int(),
+  "totalBets": zod.int(),
   "totalOutlay": zod.number(),
   "totalReturns": zod.number(),
   "netProfitLoss": zod.number(),
@@ -249,11 +250,11 @@ export const GetPerformanceResponse = zod.object({
   "roi": zod.number(),
   "avgOddsWin": zod.number(),
   "avgOddsPlace": zod.number(),
-  "longestWinStreak": zod.number().int(),
-  "longestLosingStreak": zod.number().int(),
-  "totalWins": zod.number().int(),
-  "totalPlaced": zod.number().int(),
-  "totalUnplaced": zod.number().int()
+  "longestWinStreak": zod.int(),
+  "longestLosingStreak": zod.int(),
+  "totalWins": zod.int(),
+  "totalPlaced": zod.int(),
+  "totalUnplaced": zod.int()
 })
 
 
@@ -261,15 +262,15 @@ export const GetPerformanceResponse = zod.object({
  * @summary Get historical bet results
  */
 export const GetBetHistoryResponseItem = zod.object({
-  "id": zod.number().int(),
-  "nominationId": zod.number().int(),
-  "raceId": zod.number().int(),
-  "runnerId": zod.number().int(),
+  "id": zod.int(),
+  "nominationId": zod.int(),
+  "raceId": zod.int(),
+  "runnerId": zod.int(),
   "trackName": zod.string(),
   "raceDate": zod.string(),
   "horseName": zod.string(),
-  "finishPosition": zod.number().int(),
-  "fieldSize": zod.number().int(),
+  "finishPosition": zod.int(),
+  "fieldSize": zod.int(),
   "winStake": zod.number(),
   "placeStake": zod.number(),
   "totalOutlay": zod.number(),
@@ -287,7 +288,7 @@ export const GetBetHistoryResponse = zod.array(GetBetHistoryResponseItem)
 export const GetTrackBreakdownResponseItem = zod.object({
   "trackName": zod.string(),
   "state": zod.string(),
-  "totalBets": zod.number().int(),
+  "totalBets": zod.int(),
   "totalOutlay": zod.number(),
   "totalReturns": zod.number(),
   "netProfitLoss": zod.number(),
@@ -303,10 +304,10 @@ export const GetTrackBreakdownResponse = zod.array(GetTrackBreakdownResponseItem
  * @summary Trigger race data sync
  */
 export const TriggerSyncResponse = zod.object({
-  "racesFound": zod.number().int(),
-  "racesAdded": zod.number().int(),
-  "runnersAdded": zod.number().int(),
-  "nominationsGenerated": zod.number().int(),
+  "racesFound": zod.int(),
+  "racesAdded": zod.int(),
+  "runnersAdded": zod.int(),
+  "nominationsGenerated": zod.int(),
   "message": zod.string()
 })
 

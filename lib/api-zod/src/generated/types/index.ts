@@ -11,6 +11,7 @@ export * from './betResultOutcome';
 export * from './filterResult';
 export * from './healthStatus';
 export * from './nomination';
+export * from './nominationDataSource';
 export * from './nominationStatus';
 export * from './nominationSummary';
 export * from './nominationSummaryByStateItem';

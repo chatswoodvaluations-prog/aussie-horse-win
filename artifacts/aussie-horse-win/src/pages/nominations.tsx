@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil } from 'lucide-react';
+import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil, Wifi, FlaskConical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Nominations() {
@@ -188,9 +188,22 @@ function NominationCard({ nom }: { nom: Nomination }) {
       <CardHeader className="p-4 pb-0 flex flex-row items-start justify-between space-y-0">
         <div className="flex-1">
           <div className="flex justify-between items-start mb-2">
-            <Badge variant="outline" className={cn("font-mono text-[10px] uppercase", statusColor)}>
-              {nom.status}
-            </Badge>
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className={cn("font-mono text-[10px] uppercase", statusColor)}>
+                {nom.status}
+              </Badge>
+              {nom.dataSource === 'live' ? (
+                <Badge variant="outline" className="font-mono text-[10px] uppercase bg-blue-500/10 text-blue-400 border-blue-500/30 flex items-center gap-1">
+                  <Wifi className="size-2.5" />
+                  Live TAB odds
+                </Badge>
+              ) : nom.dataSource === 'mock' ? (
+                <Badge variant="outline" className="font-mono text-[10px] uppercase bg-secondary text-muted-foreground border-border flex items-center gap-1">
+                  <FlaskConical className="size-2.5" />
+                  Simulated
+                </Badge>
+              ) : null}
+            </div>
 
             {/* SETTLE for pending, EDIT RESULT for settled */}
             <Dialog open={open} onOpenChange={handleCloseDialog}>
