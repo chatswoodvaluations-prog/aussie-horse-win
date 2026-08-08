@@ -1,0 +1,56 @@
+Here is a complete prompt designed to copy and paste directly into Replit Agent.
+This prompt incorporates the regional track filter rules (focusing on tracks like Bendigo, Geelong, Wagga Wagga, Dubbo, Wangaratta, and Mildura), the optimal field size constraints (8 to 11 runners), speed mapping (on-pace runners drawn in barriers 1–5), price limits ($5.00 to $10.00 win odds), and the skewed staking system ($5 Win / $20 Place).
+Prompt to Copy and Paste into Replit Agent
+Build a web application called "Aussie Horse Win" using Python (FastAPI/Flask) for the backend, SQLite for the database, and a clean HTML/Tailwind CSS frontend dashboard.
+APP OVERVIEW & OBJECTIVE
+"Aussie Horse Win" is an automated Australian horse racing analysis app. Its purpose is to scan weekly race cards across selected Australian regional tracks, evaluate race fields against strict positive Expected Value (+EV) place-betting criteria, and generate automated selection nominations each week using a skewed staking model ($5 Win / $20 Place per nomination).
+TARGET REGIONAL TRACKS
+The app must filter race meetings to include ONLY non-metropolitan regional/provincial tracks in Victoria and NSW that exhibit high favourite predictability and strong on-pace track bias.
+Included tracks:
+ * Victoria: Bendigo, Geelong, Wangaratta, Mildura, Ballarat (Provincial), Cranbourne (Provincial).
+ * New South Wales: Wagga Wagga, Dubbo, Scone, Albury, Tamworth, Hawkesbury (Provincial).
+   Reject all metropolitan tracks (Flemington, Caulfield, Moonee Valley, Randwick, Rosehill, Canterbury, Doomben, Eagle Farm, Morphettville).
+SELECTION ENGINE ALGORITHM (RULES & FILTERS)
+For every upcoming race on the target tracks, evaluate runners against the following strict rules:
+ * Field Size Rule:
+   * Total final starters MUST be between 8 and 11 runners (inclusive).
+   * REJECT any race with 7 or fewer runners (third-place dividend suspended).
+   * REJECT any race with 12 or more runners (high traffic variance and low place density).
+ * Odds Window Rule:
+   * Win Starting Price / Fixed Price MUST be between $5.00 and $10.00 (inclusive).
+   * Minimum Fixed Place Odds MUST be >= $1.85 for a $5.00 selection, or >= $2.70 for a $10.00 selection.
+ * Speed Map & Pace Rule:
+   * Settling Position: The horse MUST be predicted to settle in the front four positions in running (Lead, On-Pace, or Handy).
+   * REJECT all back-markers / back-runners settling 7th or worse.
+ * Barrier Draw Rule:
+   * Barrier Position: The horse MUST be drawn in Barrier 1 through 5 (after scratchings).
+ * Staking Calculation Engine:
+   * For every qualified runner, generate a standard recommendation:
+     * Win Stake: $5.00
+     * Place Stake: $20.00
+     * Total Outlay: $25.00
+   * Display projected payout returns for:
+     * 1st Place (Win + Place payout)
+     * 2nd/3rd Place (Place payout only)
+KEY APP FEATURES TO BUILD
+ * Weekly Race Data Ingestion / Scraper:
+   * Build a automated fetcher/scraper that runs weekly (or on demand) to gather upcoming race meetings, tracks, runner listings, barriers, speed maps, fixed win odds, and fixed place odds from accessible Australian racing APIs or public race card feeds (e.g., TAB, Racing.com, or public RSS/JSON feeds).
+   * Include a mock data generator / seed script so the app displays live-looking data immediately upon initial build.
+ * Automated Nominations Dashboard:
+   * Screen 1: "Weekly Nominations" — Displays cards for all horses that passed 100% of the filter criteria for the week. Show Track Name, Race Number, Horse Name, Barrier, Speed Map Position, Win/Place Odds, and $5/$20 Staking Breakdown.
+   * Screen 2: "Race Explorer" — Allows users to view all upcoming races across target tracks, highlighting why specific horses passed or failed the filters (e.g., "Failed: Field size 14 > 11" or "Passed: On-pace from Barrier 2").
+   * Screen 3: "Track & Filter Settings" — Toggle target tracks on/off, adjust field size range (default 8–11), and adjust odds thresholds ($5.00–$10.00).
+ * Performance & Results Tracker:
+   * Store historical race results (1st, 2nd, 3rd, Unplaced).
+   * Calculate live overall metrics: Total Bets, Total Outlay (), Total Returns (), Net Profit/Loss ($), Win Strike Rate (%), Place Strike Rate (%), and Return on Investment (ROI %).
+TECH STACK & DESIGN REQUIREMENTS
+ * Backend: Python (FastAPI or Flask) with APScheduler for background data pulls.
+ * Database: SQLite (tables for Tracks, Races, Runners, Nominations, and Bet History).
+ * Frontend: Tailwind CSS with dark mode UI, clear green/red status badges for pass/fail filters, and interactive tables.
+ * Deployment: Fully configured to run out-of-the-box on Replit with an interactive web view.
+Please build the app structure, database schemas, API routes, data scraper/seed logic, and frontend views step-by-step.
+How to Use This Prompt on Replit
+ * Open Replit and select Create Repl using Replit Agent.
+ * Paste the prompt block above into the Replit Agent chat window.
+ * Replit Agent will initialize the repository, install Python packages (such as FastAPI, Uvicorn, SQLAlchemy, and BeautifulSoup4/requests), build the SQLite database, and launch the web server.
+ * Once built, you can run the app directly in Replit's web preview. You can customize your data sources or add real-time API integrations (such as Betfair or TAB endpoints) in the configuration panel.

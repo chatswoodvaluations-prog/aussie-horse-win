@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Aussie Horse Win"
+description = "An automated Australian horse racing analysis app that scans weekly race cards across regional tracks, evaluates race fields against strict +EV place-betting criteria, and generates automated selection nominations each week using a skewed staking model ($5 Win / $20 Place)."
+version = "1.0.0"
+id = "artifacts/aussie-horse-win"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20298
+
+[services.development]
+run = "pnpm --filter @workspace/aussie-horse-win run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/aussie-horse-win", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/aussie-horse-win/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20298"
+BASE_PATH = "/"

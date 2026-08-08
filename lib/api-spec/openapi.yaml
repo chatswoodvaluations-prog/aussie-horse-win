@@ -3,13 +3,24 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Aussie Horse Win API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: nominations
+    description: Weekly race nominations
+  - name: races
+    description: Race explorer
+  - name: settings
+    description: Track and filter settings
+  - name: performance
+    description: Performance and results tracker
+  - name: sync
+    description: Data sync operations
+
 paths:
   /healthz:
     get:
@@ -24,6 +35,202 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /nominations:
+    get:
+      operationId: getNominations
+      tags: [nominations]
+      summary: Get weekly nominations
+      description: Returns all horses that passed 100% of filter criteria
+      responses:
+        "200":
+          description: List of qualified nominations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Nomination"
+
+  /nominations/summary:
+    get:
+      operationId: getNominationsSummary
+      tags: [nominations]
+      summary: Get nominations summary stats
+      description: Returns aggregate stats about this week's nominations
+      responses:
+        "200":
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NominationSummary"
+
+  /races:
+    get:
+      operationId: getRaces
+      tags: [races]
+      summary: Get all upcoming races with filter evaluation
+      description: Returns all upcoming races across target tracks with pass/fail filter details for each runner
+      responses:
+        "200":
+          description: List of races with runner filter results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Race"
+
+  /races/{id}:
+    get:
+      operationId: getRace
+      tags: [races]
+      summary: Get a single race with full runner details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Race with runner filter results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Race"
+        "404":
+          description: Race not found
+
+  /races/{id}/result:
+    post:
+      operationId: recordResult
+      tags: [races]
+      summary: Record race result for a runner
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResultInput"
+      responses:
+        "200":
+          description: Result recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BetResult"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get current filter settings
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update filter settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  /tracks:
+    get:
+      operationId: getTracks
+      tags: [settings]
+      summary: Get all tracks with enabled/disabled status
+      responses:
+        "200":
+          description: List of tracks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Track"
+
+  /performance:
+    get:
+      operationId: getPerformance
+      tags: [performance]
+      summary: Get overall performance metrics
+      description: Returns total bets, outlay, returns, profit/loss, strike rates, ROI
+      responses:
+        "200":
+          description: Performance metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Performance"
+
+  /performance/history:
+    get:
+      operationId: getBetHistory
+      tags: [performance]
+      summary: Get historical bet results
+      responses:
+        "200":
+          description: List of historical bet results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BetResult"
+
+  /performance/track-breakdown:
+    get:
+      operationId: getTrackBreakdown
+      tags: [performance]
+      summary: Performance breakdown by track
+      responses:
+        "200":
+          description: Per-track performance stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrackPerformance"
+
+  /sync:
+    post:
+      operationId: triggerSync
+      tags: [sync]
+      summary: Trigger race data sync
+      description: Fetches/generates upcoming race card data and runs the selection engine
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResult"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +241,450 @@ components:
       required:
         - status
 
+    Track:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        state:
+          type: string
+          enum: [VIC, NSW]
+        type:
+          type: string
+          enum: [Regional, Provincial]
+        enabled:
+          type: boolean
+      required:
+        - id
+        - name
+        - state
+        - type
+        - enabled
+
+    Runner:
+      type: object
+      properties:
+        id:
+          type: integer
+        raceId:
+          type: integer
+        horseName:
+          type: string
+        barrierNumber:
+          type: integer
+        speedMapPosition:
+          type: string
+          enum: [Lead, On-Pace, Handy, Midfield, Back-Marker]
+        winOdds:
+          type: number
+        placeOdds:
+          type: number
+        jockey:
+          type: ["string", "null"]
+        trainer:
+          type: ["string", "null"]
+        passed:
+          type: boolean
+        filterResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilterResult"
+      required:
+        - id
+        - raceId
+        - horseName
+        - barrierNumber
+        - speedMapPosition
+        - winOdds
+        - placeOdds
+        - passed
+        - filterResults
+
+    FilterResult:
+      type: object
+      properties:
+        rule:
+          type: string
+        passed:
+          type: boolean
+        message:
+          type: string
+      required:
+        - rule
+        - passed
+        - message
+
+    Race:
+      type: object
+      properties:
+        id:
+          type: integer
+        trackName:
+          type: string
+        state:
+          type: string
+        raceNumber:
+          type: integer
+        raceName:
+          type: ["string", "null"]
+        raceDate:
+          type: string
+        raceTime:
+          type: ["string", "null"]
+        fieldSize:
+          type: integer
+        distance:
+          type: ["integer", "null"]
+        runners:
+          type: array
+          items:
+            $ref: "#/components/schemas/Runner"
+        qualifiedCount:
+          type: integer
+      required:
+        - id
+        - trackName
+        - state
+        - raceNumber
+        - raceDate
+        - fieldSize
+        - runners
+        - qualifiedCount
+
+    Nomination:
+      type: object
+      properties:
+        id:
+          type: integer
+        raceId:
+          type: integer
+        runnerId:
+          type: integer
+        trackName:
+          type: string
+        state:
+          type: string
+        raceNumber:
+          type: integer
+        raceName:
+          type: ["string", "null"]
+        raceDate:
+          type: string
+        raceTime:
+          type: ["string", "null"]
+        horseName:
+          type: string
+        barrierNumber:
+          type: integer
+        speedMapPosition:
+          type: string
+        winOdds:
+          type: number
+        placeOdds:
+          type: number
+        winStake:
+          type: number
+        placeStake:
+          type: number
+        totalOutlay:
+          type: number
+        projectedWinReturn:
+          type: number
+        projectedPlaceReturn:
+          type: number
+        jockey:
+          type: ["string", "null"]
+        trainer:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [Pending, Won, Placed, Unplaced]
+      required:
+        - id
+        - raceId
+        - runnerId
+        - trackName
+        - state
+        - raceNumber
+        - raceDate
+        - horseName
+        - barrierNumber
+        - speedMapPosition
+        - winOdds
+        - placeOdds
+        - winStake
+        - placeStake
+        - totalOutlay
+        - projectedWinReturn
+        - projectedPlaceReturn
+        - status
+
+    NominationSummary:
+      type: object
+      properties:
+        totalNominations:
+          type: integer
+        totalOutlay:
+          type: number
+        byTrack:
+          type: array
+          items:
+            type: object
+            properties:
+              trackName:
+                type: string
+              count:
+                type: integer
+            required:
+              - trackName
+              - count
+        byState:
+          type: array
+          items:
+            type: object
+            properties:
+              state:
+                type: string
+              count:
+                type: integer
+            required:
+              - state
+              - count
+        pendingCount:
+          type: integer
+        wonCount:
+          type: integer
+        placedCount:
+          type: integer
+        unplacedCount:
+          type: integer
+      required:
+        - totalNominations
+        - totalOutlay
+        - byTrack
+        - byState
+        - pendingCount
+        - wonCount
+        - placedCount
+        - unplacedCount
+
+    Settings:
+      type: object
+      properties:
+        fieldSizeMin:
+          type: integer
+        fieldSizeMax:
+          type: integer
+        minWinOdds:
+          type: number
+        maxWinOdds:
+          type: number
+        minPlaceOdds:
+          type: number
+        winStake:
+          type: number
+        placeStake:
+          type: number
+        enabledTrackIds:
+          type: array
+          items:
+            type: integer
+      required:
+        - fieldSizeMin
+        - fieldSizeMax
+        - minWinOdds
+        - maxWinOdds
+        - minPlaceOdds
+        - winStake
+        - placeStake
+        - enabledTrackIds
+
+    SettingsInput:
+      type: object
+      properties:
+        fieldSizeMin:
+          type: integer
+        fieldSizeMax:
+          type: integer
+        minWinOdds:
+          type: number
+        maxWinOdds:
+          type: number
+        minPlaceOdds:
+          type: number
+        winStake:
+          type: number
+        placeStake:
+          type: number
+        enabledTrackIds:
+          type: array
+          items:
+            type: integer
+
+    ResultInput:
+      type: object
+      properties:
+        runnerId:
+          type: integer
+        finishPosition:
+          type: integer
+        actualWinReturn:
+          type: ["number", "null"]
+        actualPlaceReturn:
+          type: ["number", "null"]
+      required:
+        - runnerId
+        - finishPosition
+
+    BetResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        nominationId:
+          type: integer
+        raceId:
+          type: integer
+        runnerId:
+          type: integer
+        trackName:
+          type: string
+        raceDate:
+          type: string
+        horseName:
+          type: string
+        finishPosition:
+          type: integer
+        fieldSize:
+          type: integer
+        winStake:
+          type: number
+        placeStake:
+          type: number
+        totalOutlay:
+          type: number
+        actualWinReturn:
+          type: ["number", "null"]
+        actualPlaceReturn:
+          type: ["number", "null"]
+        netResult:
+          type: number
+        outcome:
+          type: string
+          enum: [Won, Placed, Unplaced]
+      required:
+        - id
+        - nominationId
+        - raceId
+        - runnerId
+        - trackName
+        - raceDate
+        - horseName
+        - finishPosition
+        - fieldSize
+        - winStake
+        - placeStake
+        - totalOutlay
+        - netResult
+        - outcome
+
+    Performance:
+      type: object
+      properties:
+        totalBets:
+          type: integer
+        totalOutlay:
+          type: number
+        totalReturns:
+          type: number
+        netProfitLoss:
+          type: number
+        winStrikeRate:
+          type: number
+        placeStrikeRate:
+          type: number
+        roi:
+          type: number
+        avgOddsWin:
+          type: number
+        avgOddsPlace:
+          type: number
+        longestWinStreak:
+          type: integer
+        longestLosingStreak:
+          type: integer
+        totalWins:
+          type: integer
+        totalPlaced:
+          type: integer
+        totalUnplaced:
+          type: integer
+      required:
+        - totalBets
+        - totalOutlay
+        - totalReturns
+        - netProfitLoss
+        - winStrikeRate
+        - placeStrikeRate
+        - roi
+        - avgOddsWin
+        - avgOddsPlace
+        - longestWinStreak
+        - longestLosingStreak
+        - totalWins
+        - totalPlaced
+        - totalUnplaced
+
+    TrackPerformance:
+      type: object
+      properties:
+        trackName:
+          type: string
+        state:
+          type: string
+        totalBets:
+          type: integer
+        totalOutlay:
+          type: number
+        totalReturns:
+          type: number
+        netProfitLoss:
+          type: number
+        winStrikeRate:
+          type: number
+        placeStrikeRate:
+          type: number
+        roi:
+          type: number
+      required:
+        - trackName
+        - state
+        - totalBets
+        - totalOutlay
+        - totalReturns
+        - netProfitLoss
+        - winStrikeRate
+        - placeStrikeRate
+        - roi
+
+    SyncResult:
+      type: object
+      properties:
+        racesFound:
+          type: integer
+        racesAdded:
+          type: integer
+        runnersAdded:
+          type: integer
+        nominationsGenerated:
+          type: integer
+        message:
+          type: string
+      required:
+        - racesFound
+        - racesAdded
+        - runnersAdded
+        - nominationsGenerated
+        - message
