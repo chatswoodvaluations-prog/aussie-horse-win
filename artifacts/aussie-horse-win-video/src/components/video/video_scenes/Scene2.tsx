@@ -4,55 +4,57 @@ import { sceneTransitions } from '@/lib/video';
 export function Scene2() {
   const filters = [
     { label: 'FIELD SIZE', condition: '8 TO 11', result: 'PASS' },
-    { label: 'WIN ODDS', condition: '$5.00 - $10.00', result: 'PASS' },
-    { label: 'MIN PLACE ODDS', condition: '>= $1.85', result: 'PASS' },
-    { label: 'SPEED MAP', condition: 'LEAD/ON-PACE/HANDY', result: 'PASS' },
-    { label: 'BARRIER DRAW', condition: '1 TO 5', result: 'PASS' },
+    { label: 'WIN ODDS', condition: '$5.00 – $10.00', result: 'PASS' },
+    { label: 'PLACE ODDS', condition: '>= $1.85', result: 'PASS' },
+    { label: 'SPEED MAP', condition: 'LEAD / ON-PACE / HANDY', result: 'PASS' },
+    { label: 'BARRIER DRAW', condition: 'BARRIER 1 TO 5', result: 'PASS' },
   ];
 
   return (
     <motion.div
-      className="absolute inset-0 bg-bg-dark text-text-primary flex items-center justify-center overflow-hidden"
+      className="absolute inset-0 bg-black text-white flex items-center justify-center overflow-hidden"
       variants={sceneTransitions.slideUp}
       initial="initial"
       animate="animate"
       exit="exit"
     >
-      <div className="absolute inset-0 grid-bg opacity-30"></div>
-      <div className="absolute inset-0 scanlines z-50"></div>
-      
-      <div className="w-[80vw] border border-text-muted/30 bg-bg-light/80 backdrop-blur-sm shadow-2xl shadow-accent/5 p-8 relative z-10 flex flex-col font-mono">
+      <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none" />
+      <div className="absolute inset-0 scanlines z-50 pointer-events-none" />
+
+      <div className="w-[84vw] border border-white/20 bg-[#0a0a0a] shadow-2xl shadow-[#00ff41]/10 p-[3vw] relative z-10 flex flex-col font-mono">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-accent text-[1.5vw] mb-8 font-bold border-b border-text-muted/30 pb-4 flex justify-between"
+          className="text-[#00ff41] text-[1.8vw] mb-[2vw] font-bold border-b border-white/20 pb-[1.5vw] flex justify-between"
         >
           <span>SYSTEM // +EV SELECTION ENGINE</span>
-          <span>STATUS: ACTIVE</span>
+          <span className="text-white/50">STATUS: ACTIVE</span>
         </motion.div>
 
-        <div className="flex flex-col gap-6 text-[2vw]">
+        {/* Filter rows */}
+        <div className="flex flex-col gap-[1.4vw] text-[2.2vw]">
           {filters.map((f, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0.2, color: 'var(--color-text-muted)' }}
-              animate={{ opacity: 1, color: 'var(--color-text-primary)' }}
-              transition={{ delay: 0.8 + i * 0.8, duration: 0.2 }}
-              className="flex items-center justify-between border-b border-text-muted/10 pb-4"
+              initial={{ opacity: 0.15 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 + i * 0.9, duration: 0.3 }}
+              className="flex items-center justify-between border-b border-white/10 pb-[1.2vw]"
             >
-              <div className="flex gap-8">
-                <span className="w-[4vw] text-text-muted opacity-50">0{i + 1}</span>
-                <span>{f.label}</span>
+              <div className="flex gap-[2vw] items-center">
+                <span className="text-white/30 text-[1.5vw] w-[2vw]">0{i + 1}</span>
+                <span className="text-white font-bold tracking-wide">{f.label}</span>
               </div>
-              
-              <div className="flex items-center gap-12 text-[1.8vw]">
-                <span className="text-text-muted">[{f.condition}]</span>
+
+              <div className="flex items-center gap-[2.5vw]">
+                <span className="text-white/50 text-[1.8vw]">{f.condition}</span>
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.5 }}
+                  initial={{ opacity: 0, scale: 0.4 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 1.2 + i * 0.8, type: 'spring', stiffness: 400, damping: 20 }}
-                  className="bg-accent text-bg-dark px-4 py-1 font-bold"
+                  transition={{ delay: 1.0 + i * 0.9, type: 'spring', stiffness: 500, damping: 22 }}
+                  className="bg-[#00ff41] text-black px-[1.2vw] py-[0.3vw] font-black text-[1.8vw] min-w-[6vw] text-center"
                 >
                   {f.result}
                 </motion.div>
@@ -61,14 +63,15 @@ export function Scene2() {
           ))}
         </div>
 
+        {/* Summary */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 5.5, duration: 0.3 }}
-          className="mt-12 text-center text-[2.5vw] font-display font-bold tracking-widest"
+          transition={{ delay: 6.0, duration: 0.4 }}
+          className="mt-[2vw] text-center text-[2.8vw] font-display font-bold tracking-widest"
         >
-          <span className="text-text-muted mr-4">142 RUNNERS SCANNED.</span>
-          <span className="text-accent">3 QUALIFY.</span>
+          <span className="text-white/60 mr-4">142 RUNNERS SCANNED.</span>
+          <span className="text-[#00ff41]">3 QUALIFY.</span>
         </motion.div>
       </div>
     </motion.div>

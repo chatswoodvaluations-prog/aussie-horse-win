@@ -1,5 +1,5 @@
 import { useVideoPlayer } from '@/lib/video';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 
 import { Scene1 } from './video_scenes/Scene1';
@@ -78,6 +78,35 @@ export default function VideoTemplate({
       <AnimatePresence mode="popLayout">
         {SceneComponent && <SceneComponent key={currentSceneKey} />}
       </AnimatePresence>
+
+      {/* Horse galloping across — persistent element, runs 3× during the 32s loop */}
+      <motion.div
+        className="absolute z-40 pointer-events-none"
+        style={{ bottom: '18%', left: 0 }}
+        animate={{ x: ['-28vw', '115vw'] }}
+        transition={{
+          duration: 3.2,
+          repeat: Infinity,
+          repeatDelay: 7.5,
+          ease: 'linear',
+        }}
+      >
+        {/* Dust shadow beneath the horse */}
+        <motion.div
+          className="absolute bottom-0 left-[10%] right-[10%] h-[1.5vw] rounded-full"
+          style={{
+            background: 'radial-gradient(ellipse, rgba(0,255,65,0.18) 0%, transparent 70%)',
+            filter: 'blur(6px)',
+          }}
+          animate={{ scaleX: [0.8, 1.1, 0.8], opacity: [0.4, 0.7, 0.4] }}
+          transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <img
+          src={`${import.meta.env.BASE_URL}images/horse.png`}
+          alt=""
+          style={{ width: '24vw', height: 'auto', display: 'block', filter: 'drop-shadow(0 0 12px rgba(0,255,65,0.35))' }}
+        />
+      </motion.div>
 
       <audio
         ref={audioRef}
