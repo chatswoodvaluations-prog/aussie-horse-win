@@ -1,13 +1,15 @@
 import { Router } from "express";
 import { TriggerSyncResponse } from "@workspace/api-zod";
 import { runSelectionEngine, getSettings } from "../lib/selectionEngine";
-import { db, tracksTable, racesTable, runnersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, tracksTable, racesTable, runnersTable, nominationsTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { fetchLiveRaceCards, getSydneyDateStrings, type LiveMeeting } from "../lib/tabFetcher";
 
 const router = Router();
 
-// Mock race data generator — creates realistic-looking upcoming race cards
+// ── Mock data generator (fallback) ──────────────────────────────────────────
+
 const SPEED_POSITIONS = ["Lead", "On-Pace", "Handy", "Midfield", "Back-Marker"] as const;
 const JOCKEYS = [
   "Craig Williams", "Damian Lane", "Mark Zahra", "John Allen",
@@ -49,84 +51,218 @@ function randomElement<T>(arr: readonly T[]): T {
 function randomHorseName(used: Set<string>): string {
   let name: string;
   do {
-    name = randomElement(HORSE_NAMES) + (Math.random() > 0.7 ? ` ${["II", "III", "Star", "Boy", "Girl", "King", "Queen"][Math.floor(Math.random() * 7)]}` : "");
+    name =
+      randomElement(HORSE_NAMES) +
+      (Math.random() > 0.7
+        ? ` ${["II", "III", "Star", "Boy", "Girl", "King", "Queen"][Math.floor(Math.random() * 7)]}`
+        : "");
   } while (used.has(name));
   used.add(name);
   return name;
 }
 
-router.post("/sync", async (req, res): Promise<void> => {
-  logger.info("Starting data sync");
+// ── Live-data insertion helper ───────────────────────────────────────────────
 
-  const settings = await getSettings();
-  const tracks = await db.select().from(tracksTable).where(eq(tracksTable.enabled, true));
+/**
+ * Normalise a venue name from the TAB API to match our track names.
+ * TAB uses names like "Flemington" while our seed uses "Flemington" too,
+ * so this is mostly a trim/case guard.
+ */
+function normalisedMatch(tabName: string, trackName: string): boolean {
+  return (
+    tabName.trim().toLowerCase() === trackName.trim().toLowerCase()
+  );
+}
 
-  if (tracks.length === 0) {
-    res.json(TriggerSyncResponse.parse({
-      racesFound: 0,
-      racesAdded: 0,
-      runnersAdded: 0,
-      nominationsGenerated: 0,
-      message: "No enabled tracks found",
-    }));
-    return;
+async function insertLiveRaceCards(
+  meetings: LiveMeeting[],
+  tracks: { id: number; name: string; state: string }[]
+): Promise<{ racesAdded: number; runnersAdded: number; runnersUpdated: number }> {
+  let racesAdded = 0;
+  let runnersAdded = 0;
+  let runnersUpdated = 0;
+
+  for (const meeting of meetings) {
+    // Find the matching track in our database
+    const track = tracks.find(
+      (t) =>
+        normalisedMatch(meeting.venueName, t.name) &&
+        t.state === meeting.venueState
+    );
+
+    if (!track) {
+      logger.debug(
+        { venue: meeting.venueName, state: meeting.venueState },
+        "Live sync: no matching enabled track, skipping meeting"
+      );
+      continue;
+    }
+
+    for (const race of meeting.races) {
+      // Check whether we already have this race
+      const existingRaces = await db
+        .select()
+        .from(racesTable)
+        .where(
+          and(
+            eq(racesTable.trackId, track.id),
+            eq(racesTable.raceDate, race.raceDate),
+            eq(racesTable.raceNumber, race.raceNumber)
+          )
+        );
+
+      let raceId: number;
+
+      if (existingRaces.length > 0) {
+        // Race already exists (possibly seeded with mock data).
+        // Replace it completely: delete all current runners and re-insert the
+        // authoritative TAB runner set.  This prevents mock horse names / odds
+        // from persisting alongside live market data.
+        raceId = existingRaces[0].id;
+
+        // Update race-level metadata (time, distance, field size) from TAB
+        await db
+          .update(racesTable)
+          .set({
+            raceName: race.raceName,
+            raceTime: race.raceTime,
+            fieldSize: race.fieldSize,
+            distance: race.distance,
+          })
+          .where(eq(racesTable.id, raceId));
+
+        // Remove pending nominations that reference the soon-to-be-deleted runners.
+        // Historical records (Won, Placed, Unplaced) are preserved — they represent
+        // completed bets and must not be discarded.
+        const staleRunners = await db
+          .select()
+          .from(runnersTable)
+          .where(eq(runnersTable.raceId, raceId));
+        for (const staleRunner of staleRunners) {
+          await db
+            .delete(nominationsTable)
+            .where(
+              and(
+                eq(nominationsTable.runnerId, staleRunner.id),
+                eq(nominationsTable.status, "Pending")
+              )
+            );
+        }
+
+        // Remove all existing runners for this race
+        await db.delete(runnersTable).where(eq(runnersTable.raceId, raceId));
+
+        // Insert the real TAB runners
+        for (const runner of race.runners) {
+          await db.insert(runnersTable).values({
+            raceId,
+            horseName: runner.horseName,
+            barrierNumber: runner.barrierNumber,
+            speedMapPosition: runner.speedMapPosition,
+            winOdds: runner.winOdds,
+            placeOdds: runner.placeOdds,
+            jockey: runner.jockey,
+            trainer: runner.trainer,
+            passed: false,
+            filterResults: "[]",
+          });
+          runnersUpdated++;
+        }
+      } else {
+        // New race — insert race record and all runners
+        const [insertedRace] = await db
+          .insert(racesTable)
+          .values({
+            trackId: track.id,
+            trackName: track.name,
+            state: track.state,
+            raceNumber: race.raceNumber,
+            raceName: race.raceName,
+            raceDate: race.raceDate,
+            raceTime: race.raceTime,
+            fieldSize: race.fieldSize,
+            distance: race.distance,
+          })
+          .returning();
+
+        racesAdded++;
+        raceId = insertedRace.id;
+
+        for (const runner of race.runners) {
+          await db.insert(runnersTable).values({
+            raceId,
+            horseName: runner.horseName,
+            barrierNumber: runner.barrierNumber,
+            speedMapPosition: runner.speedMapPosition,
+            winOdds: runner.winOdds,
+            placeOdds: runner.placeOdds,
+            jockey: runner.jockey,
+            trainer: runner.trainer,
+            passed: false,
+            filterResults: "[]",
+          });
+          runnersAdded++;
+        }
+      }
+    }
   }
 
+  return { racesAdded, runnersAdded, runnersUpdated };
+}
+
+// ── Mock-data insertion (fallback) ───────────────────────────────────────────
+
+async function insertMockRaceCards(
+  tracks: { id: number; name: string; state: string }[],
+  dates: string[]
+): Promise<{ racesAdded: number; runnersAdded: number }> {
   let racesAdded = 0;
   let runnersAdded = 0;
 
-  // Generate race cards for the next 7 days for each enabled track
-  const today = new Date();
-  const dates: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().split("T")[0]);
-  }
-
   for (const track of tracks) {
     for (const date of dates) {
-      // Check if we already have races for this track + date
-      const existing = await db.select().from(racesTable)
+      const existing = await db
+        .select()
+        .from(racesTable)
         .where(eq(racesTable.trackId, track.id));
       const existingForDate = existing.filter((r) => r.raceDate === date);
-
       if (existingForDate.length > 0) continue;
 
-      // Generate 5-8 races per meeting
       const numRaces = Math.floor(Math.random() * 4) + 5;
       for (let raceNum = 1; raceNum <= numRaces; raceNum++) {
-        // Field size between 6 and 14 (varied to test filters)
         const fieldSize = Math.floor(Math.random() * 9) + 6;
-        const distance = [1000, 1100, 1200, 1300, 1400, 1600, 1800, 2000, 2400][Math.floor(Math.random() * 9)];
-        const hour = 11 + Math.floor(raceNum * 35 / 60);
+        const distance = [1000, 1100, 1200, 1300, 1400, 1600, 1800, 2000, 2400][
+          Math.floor(Math.random() * 9)
+        ];
+        const hour = 11 + Math.floor((raceNum * 35) / 60);
         const minute = (raceNum * 35) % 60;
         const raceTime = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 
-        const [insertedRace] = await db.insert(racesTable).values({
-          trackId: track.id,
-          trackName: track.name,
-          state: track.state,
-          raceNumber: raceNum,
-          raceName: `Race ${raceNum} - ${distance}m`,
-          raceDate: date,
-          raceTime,
-          fieldSize,
-          distance,
-        }).returning();
+        const [insertedRace] = await db
+          .insert(racesTable)
+          .values({
+            trackId: track.id,
+            trackName: track.name,
+            state: track.state,
+            raceNumber: raceNum,
+            raceName: `Race ${raceNum} - ${distance}m`,
+            raceDate: date,
+            raceTime,
+            fieldSize,
+            distance,
+          })
+          .returning();
 
         racesAdded++;
 
-        // Generate runners
         const usedNames = new Set<string>();
         for (let barrier = 1; barrier <= fieldSize; barrier++) {
           const speedIdx = Math.floor(Math.random() * SPEED_POSITIONS.length);
           const speedPos = SPEED_POSITIONS[speedIdx];
-
-          // Varied odds: some in range, some outside to test filters
           const winOdds = randomBetween(2.5, 15.0);
-          // Place odds typically 25-35% of win odds
-          const placeOdds = parseFloat((winOdds * randomBetween(0.25, 0.38)).toFixed(2));
+          const placeOdds = parseFloat(
+            (winOdds * randomBetween(0.25, 0.38)).toFixed(2)
+          );
 
           await db.insert(runnersTable).values({
             raceId: insertedRace.id,
@@ -146,7 +282,68 @@ router.post("/sync", async (req, res): Promise<void> => {
     }
   }
 
-  // Run selection engine to evaluate and generate nominations
+  return { racesAdded, runnersAdded };
+}
+
+// ── Route ────────────────────────────────────────────────────────────────────
+
+router.post("/sync", async (req, res): Promise<void> => {
+  logger.info("Starting data sync");
+
+  await getSettings();
+  const tracks = await db
+    .select()
+    .from(tracksTable)
+    .where(eq(tracksTable.enabled, true));
+
+  if (tracks.length === 0) {
+    res.json(
+      TriggerSyncResponse.parse({
+        racesFound: 0,
+        racesAdded: 0,
+        runnersAdded: 0,
+        nominationsGenerated: 0,
+        message: "No enabled tracks found",
+      })
+    );
+    return;
+  }
+
+  // Build the date window: today + next 6 days in Sydney local time.
+  // Using Sydney time avoids selecting the wrong date around the UTC day boundary
+  // (22:00–00:00 UTC is already "tomorrow" in Sydney during AEST).
+  const dates = getSydneyDateStrings(7);
+
+  let racesAdded = 0;
+  let runnersAdded = 0;
+  let dataSource: "live" | "mock" = "mock";
+
+  // ── Attempt live TAB data ──────────────────────────────────────────────────
+  const states = [...new Set(tracks.map((t) => t.state))];
+
+  try {
+    const { meetings } = await fetchLiveRaceCards(dates, states);
+    const counts = await insertLiveRaceCards(meetings, tracks);
+    racesAdded = counts.racesAdded;
+    runnersAdded = counts.runnersAdded;
+    dataSource = "live";
+    logger.info(
+      { racesAdded, runnersAdded, runnersUpdated: counts.runnersUpdated },
+      "Sync: live TAB data inserted successfully"
+    );
+  } catch (err) {
+    // ── Fall back to mock generator ──────────────────────────────────────────
+    logger.warn(
+      { err },
+      "Sync: TAB live fetch failed — falling back to mock data generator"
+    );
+    const counts = await insertMockRaceCards(tracks, dates);
+    racesAdded = counts.racesAdded;
+    runnersAdded = counts.runnersAdded;
+    dataSource = "mock";
+  }
+
+  // Run the selection engine regardless of data source
   const engineResult = await runSelectionEngine();
 
   const result = {
@@ -154,7 +351,7 @@ router.post("/sync", async (req, res): Promise<void> => {
     racesAdded,
     runnersAdded,
     nominationsGenerated: engineResult.nominationsGenerated,
-    message: `Sync complete. Added ${racesAdded} races and ${runnersAdded} runners. Generated ${engineResult.nominationsGenerated} new nominations.`,
+    message: `Sync complete (source: ${dataSource}). Added ${racesAdded} races and ${runnersAdded} runners. Generated ${engineResult.nominationsGenerated} new nominations.`,
   };
 
   logger.info(result, "Sync completed");
