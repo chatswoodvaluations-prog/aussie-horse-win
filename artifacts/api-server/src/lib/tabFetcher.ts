@@ -12,9 +12,41 @@
  * Speed-map position is not available in the TAB feed; we derive a
  * deterministic estimate from the barrier number (a well-known proxy for
  * on-pace tendency in Australian racing).
+ *
+ * SOCKS5 proxy support:
+ *   Set NORDVPN_SOCKS5_USER + NORDVPN_SOCKS5_PASS (secrets) and
+ *   NORDVPN_SOCKS5_HOST + NORDVPN_SOCKS5_PORT (env vars) to route TAB
+ *   requests through an Australian NordVPN SOCKS5 endpoint, bypassing the
+ *   geo-restriction when the server runs outside Australia.
  */
 
+import nodeFetch from "node-fetch";
+import { SocksProxyAgent } from "socks-proxy-agent";
 import { logger } from "./logger";
+
+// ── SOCKS5 proxy agent (built once, reused for every TAB request) ────────────
+
+let _agent: SocksProxyAgent | null | undefined = undefined; // undefined = not yet initialised
+
+function getProxyAgent(): SocksProxyAgent | null {
+  if (_agent !== undefined) return _agent;
+
+  const user = process.env.NORDVPN_SOCKS5_USER;
+  const pass = process.env.NORDVPN_SOCKS5_PASS;
+  const host = process.env.NORDVPN_SOCKS5_HOST ?? "au1025.nordvpn.com";
+  const port = process.env.NORDVPN_SOCKS5_PORT ?? "1080";
+
+  if (!user || !pass) {
+    logger.info("TAB proxy: no SOCKS5 credentials found — requests will go direct");
+    _agent = null;
+    return null;
+  }
+
+  const proxyUrl = `socks5://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
+  _agent = new SocksProxyAgent(proxyUrl);
+  logger.info({ host, port }, "TAB proxy: SOCKS5 agent initialised");
+  return _agent;
+}
 
 const TAB_BASE = "https://api.tab.com.au/v1/tab-info-service";
 const FETCH_TIMEOUT_MS = 15_000;
@@ -175,10 +207,16 @@ async function fetchMeetingsForJurisdiction(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  let resp: Response;
+  const agent = getProxyAgent();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let resp: Awaited<ReturnType<typeof nodeFetch>>;
   try {
-    resp = await fetch(url, {
-      signal: controller.signal,
+    resp = await nodeFetch(url, {
+      // node-fetch accepts signal via cast — AbortSignal is compatible at runtime
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      signal: controller.signal as any,
+      agent: agent ?? undefined,
       headers: {
         Accept: "application/json",
         "User-Agent": "AussieHorseWin/1.0 (+https://github.com/)",
