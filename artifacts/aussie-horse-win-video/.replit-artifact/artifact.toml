@@ -1,0 +1,28 @@
+kind = "video"
+previewPath = "/aussie-horse-win-video/"
+title = "Aussie Horse Win — Animated Video"
+description = "A ~60-second animated marketing video for the Aussie Horse Win racing analysis app. Dark terminal aesthetic, electric green accents, covering the problem of picking winners, the 5-filter selection engine, the 12 target regional tracks across VIC and NSW, and the disciplined $5 Win / $20 Place staking model."
+version = "1.0.0"
+id = "artifacts/aussie-horse-win-video"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/aussie-horse-win-video/" ]
+localPort = 25528
+
+[services.development]
+run = "pnpm --filter @workspace/aussie-horse-win-video run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/aussie-horse-win-video", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/aussie-horse-win-video/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25528"
+BASE_PATH = "/aussie-horse-win-video/"

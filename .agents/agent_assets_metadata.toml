@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "bxIcw6vDb0dZENy2A_rIW"
+uri = "file://artifacts/aussie-horse-win-video/public/audio/bg_music.mp3"
+type = "audio"
+title = "dark synthwave background music"
+description = "Generated music: Dark synthwave electronic instrumental scoring a data-driven horse racing terminal app reveal. Pulsing bass synth, sharp hi-hats, driving 118 BPM rhythm. Cold and precise feel with e…"
