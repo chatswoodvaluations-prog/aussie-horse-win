@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/aussie-horse-win-mobile/"
+title = "Aussie Horse Win — Mobile"
+description = "A mobile companion app for Aussie Horse Win. Lets punters check their weekly selections (nominations), explore upcoming races with filter criteria, view their P&L performance summary, and record race results (settle bets) — all from their phone at the track or TAB."
+version = "1.0.0"
+id = "artifacts/aussie-horse-win-mobile"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/aussie-horse-win-mobile/" ]
+localPort = 26158
+
+[services.development]
+run = "pnpm --filter @workspace/aussie-horse-win-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/aussie-horse-win-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/aussie-horse-win-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "26158"
+BASE_PATH = "/aussie-horse-win-mobile/"
