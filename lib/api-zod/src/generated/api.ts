@@ -189,7 +189,8 @@ export const GetSettingsResponse = zod.object({
   "minPlaceOdds": zod.number(),
   "winStake": zod.number(),
   "placeStake": zod.number(),
-  "enabledTrackIds": zod.array(zod.number().int())
+  "enabledTrackIds": zod.array(zod.number().int()),
+  "notificationEmail": zod.string().nullish().describe('Email address to notify when new qualifying selections are found')
 })
 
 
@@ -204,7 +205,8 @@ export const UpdateSettingsBody = zod.object({
   "minPlaceOdds": zod.number().optional(),
   "winStake": zod.number().optional(),
   "placeStake": zod.number().optional(),
-  "enabledTrackIds": zod.array(zod.number().int()).optional()
+  "enabledTrackIds": zod.array(zod.number().int()).optional(),
+  "notificationEmail": zod.string().nullish().describe('Email address to notify when new qualifying selections are found')
 })
 
 export const UpdateSettingsResponse = zod.object({
@@ -215,7 +217,8 @@ export const UpdateSettingsResponse = zod.object({
   "minPlaceOdds": zod.number(),
   "winStake": zod.number(),
   "placeStake": zod.number(),
-  "enabledTrackIds": zod.array(zod.number().int())
+  "enabledTrackIds": zod.array(zod.number().int()),
+  "notificationEmail": zod.string().nullish().describe('Email address to notify when new qualifying selections are found')
 })
 
 

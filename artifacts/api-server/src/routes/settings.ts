@@ -21,6 +21,7 @@ router.get("/settings", async (req, res): Promise<void> => {
     winStake: s.winStake,
     placeStake: s.placeStake,
     enabledTrackIds: JSON.parse(s.enabledTrackIds) as number[],
+    notificationEmail: s.notificationEmail ?? null,
   };
   res.json(GetSettingsResponse.parse(result));
 });
@@ -47,6 +48,10 @@ router.put("/settings", async (req, res): Promise<void> => {
   if (data.enabledTrackIds !== undefined) {
     updates.enabledTrackIds = JSON.stringify(data.enabledTrackIds);
   }
+  // Allow explicit null to clear the email; undefined means "not provided, don't change"
+  if ("notificationEmail" in data) {
+    updates.notificationEmail = data.notificationEmail ?? null;
+  }
 
   let updated;
   if (rows.length === 0) {
@@ -72,6 +77,7 @@ router.put("/settings", async (req, res): Promise<void> => {
     winStake: updated.winStake,
     placeStake: updated.placeStake,
     enabledTrackIds: JSON.parse(updated.enabledTrackIds) as number[],
+    notificationEmail: updated.notificationEmail ?? null,
   };
   res.json(UpdateSettingsResponse.parse(result));
 });

@@ -491,6 +491,10 @@ components:
           type: array
           items:
             type: integer
+        notificationEmail:
+          type: string
+          nullable: true
+          description: Email address to notify when new qualifying selections are found
       required:
         - fieldSizeMin
         - fieldSizeMax
@@ -522,6 +526,10 @@ components:
           type: array
           items:
             type: integer
+        notificationEmail:
+          type: string
+          nullable: true
+          description: Email address to notify when new qualifying selections are found
 
     ResultInput:
       type: object

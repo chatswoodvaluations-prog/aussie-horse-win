@@ -15,4 +15,6 @@ export interface SettingsInput {
   winStake?: number;
   placeStake?: number;
   enabledTrackIds?: number[];
+  /** Email address to notify when new qualifying selections are found */
+  notificationEmail?: string | null;
 }

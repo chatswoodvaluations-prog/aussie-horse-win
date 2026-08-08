@@ -5,6 +5,7 @@ import { db, tracksTable, racesTable, runnersTable, nominationsTable } from "@wo
 import { and, eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { fetchLiveRaceCards, getSydneyDateStrings, type LiveMeeting } from "../lib/tabFetcher";
+import { sendNominationAlert, type NominationSummaryRow } from "../lib/emailService";
 
 const router = Router();
 
@@ -290,7 +291,7 @@ async function insertMockRaceCards(
 router.post("/sync", async (req, res): Promise<void> => {
   logger.info("Starting data sync");
 
-  await getSettings();
+  const settings = await getSettings();
   const tracks = await db
     .select()
     .from(tracksTable)
@@ -345,6 +346,61 @@ router.post("/sync", async (req, res): Promise<void> => {
 
   // Run the selection engine regardless of data source
   const engineResult = await runSelectionEngine();
+
+  // ── Email alert ─────────────────────────────────────────────────────────
+  // Pull the full settings row to get notificationEmail and staking values.
+  const settingsRow = await db.select().from(
+    (await import("@workspace/db")).settingsTable
+  ).limit(1);
+
+  if (engineResult.nominationsGenerated > 0 && settingsRow.length > 0 && settingsRow[0].notificationEmail) {
+    // Fetch the newly-created nominations with their race/runner details
+    const { nominationsTable: nomTable, runnersTable: runTable, racesTable: raceTable } =
+      await import("@workspace/db");
+    const { eq: eqOp, and: andOp } = await import("drizzle-orm");
+
+    const newNominations = await db
+      .select({
+        nominationId: nomTable.id,
+        horseName: runTable.horseName,
+        barrierNumber: runTable.barrierNumber,
+        winOdds: runTable.winOdds,
+        placeOdds: runTable.placeOdds,
+        trackName: raceTable.trackName,
+        raceNumber: raceTable.raceNumber,
+        raceName: raceTable.raceName,
+        raceDate: raceTable.raceDate,
+        raceTime: raceTable.raceTime,
+      })
+      .from(nomTable)
+      .innerJoin(runTable, eqOp(nomTable.runnerId, runTable.id))
+      .innerJoin(raceTable, eqOp(runTable.raceId, raceTable.id))
+      .where(eqOp(nomTable.status, "Pending"))
+      .orderBy(raceTable.raceDate, raceTable.raceTime);
+
+    // Only send for nominations created in this sync (latest ones)
+    // We limit to the count the engine reported to avoid re-alerting old ones
+    const toAlert = newNominations.slice(0, engineResult.nominationsGenerated);
+
+    const summaryRows: NominationSummaryRow[] = toAlert.map((n) => ({
+      track: n.trackName,
+      raceNumber: n.raceNumber,
+      raceName: n.raceName ?? "",
+      raceDate: n.raceDate,
+      raceTime: n.raceTime ?? "",
+      horseName: n.horseName,
+      barrierNumber: n.barrierNumber,
+      winOdds: n.winOdds,
+      placeOdds: n.placeOdds,
+      winStake: settingsRow[0].winStake,
+      placeStake: settingsRow[0].placeStake,
+    }));
+
+    // Fire-and-forget — don't await to keep the sync response fast
+    sendNominationAlert(settingsRow[0].notificationEmail, summaryRows).catch((err) =>
+      logger.error({ err }, "Unhandled error in sendNominationAlert")
+    );
+  }
 
   const result = {
     racesFound: engineResult.racesFound + racesAdded,

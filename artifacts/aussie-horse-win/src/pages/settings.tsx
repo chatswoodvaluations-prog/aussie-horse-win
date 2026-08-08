@@ -8,9 +8,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
-import { SlidersHorizontal, Map, Save, Settings2 } from 'lucide-react';
+import { SlidersHorizontal, Map, Save, Settings2, Bell } from 'lucide-react';
 
 const formSchema = z.object({
   fieldSizeMin: z.coerce.number().min(4).max(24),
@@ -21,6 +20,7 @@ const formSchema = z.object({
   winStake: z.coerce.number().min(1),
   placeStake: z.coerce.number().min(1),
   enabledTrackIds: z.array(z.number()),
+  notificationEmail: z.string().email('Enter a valid email address').or(z.literal('')).nullable().optional(),
 }).refine(data => data.fieldSizeMin <= data.fieldSizeMax, {
   message: "Min field size cannot be greater than max",
   path: ["fieldSizeMin"],
@@ -47,6 +47,7 @@ export default function Settings() {
       winStake: 5,
       placeStake: 20,
       enabledTrackIds: [],
+      notificationEmail: '',
     },
   });
 
@@ -61,12 +62,19 @@ export default function Settings() {
         winStake: settings.winStake,
         placeStake: settings.placeStake,
         enabledTrackIds: settings.enabledTrackIds || [],
+        notificationEmail: settings.notificationEmail ?? '',
       });
     }
   }, [settings, form]);
 
   const onSubmit = (data: FormValues) => {
-    updateMutation.mutate({ data }, {
+    updateMutation.mutate({
+      data: {
+        ...data,
+        // Send null to clear, or the email string — never send empty string to the API
+        notificationEmail: data.notificationEmail ? data.notificationEmail : null,
+      }
+    }, {
       onSuccess: () => {
         toast.success('Settings saved successfully. Filter engine updated.');
       },
@@ -256,6 +264,46 @@ export default function Settings() {
               </CardContent>
             </Card>
           </div>
+
+          {/* ── Notifications ─────────────────────────────────────────────── */}
+          <Card className="bg-card border-border">
+            <CardHeader className="border-b border-border bg-secondary/20 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Bell className="size-5 text-primary" />
+                Selection Alerts
+              </CardTitle>
+              <CardDescription className="font-mono text-xs">
+                Get notified when new qualifying selections are found after a sync
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <FormField
+                control={form.control}
+                name="notificationEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-mono text-xs uppercase text-muted-foreground tracking-wider">
+                      Alert Email Address
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="you@example.com"
+                        {...field}
+                        value={field.value ?? ''}
+                        className="font-mono bg-background border-border max-w-sm mt-2"
+                      />
+                    </FormControl>
+                    <FormDescription className="font-mono text-xs text-muted-foreground mt-2">
+                      An email listing track, race, horse, barrier, odds, and staking will be sent after any sync that produces new nominations.
+                      Leave blank to disable alerts.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
 
           <Card className="bg-card border-border">
             <CardHeader className="border-b border-border bg-secondary/20 pb-4">

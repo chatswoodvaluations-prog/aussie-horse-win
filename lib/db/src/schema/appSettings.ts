@@ -20,6 +20,7 @@ export const settingsTable = pgTable("settings", {
   winStake: real("win_stake").notNull().default(5.0),
   placeStake: real("place_stake").notNull().default(20.0),
   enabledTrackIds: text("enabled_track_ids").notNull().default("[]"), // JSON array of IDs
+  notificationEmail: text("notification_email"), // nullable — email for post-sync alerts
 });
 
 export const insertSettingsSchema = createInsertSchema(settingsTable).omit({ id: true });
