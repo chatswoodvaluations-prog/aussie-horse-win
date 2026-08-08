@@ -4,6 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Activity, TrendingUp, TrendingDown, Crosshair, DollarSign, ListOrdered, CalendarDays, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 export default function PerformanceDashboard() {
   const { data: perf, isLoading: isPerfLoading } = useGetPerformance();
@@ -49,6 +52,9 @@ export default function PerformanceDashboard() {
           <KpiCard title="Worst Streak" value={`${perf.longestLosingStreak} Losses`} valueColor="text-destructive" />
         </div>
       ) : null}
+
+      {/* Cumulative P&L Chart */}
+      <PnlChart history={history} isLoading={isHistoryLoading} />
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Track Breakdown */}
@@ -179,6 +185,89 @@ export default function PerformanceDashboard() {
         </Card>
       </div>
     </div>
+  );
+}
+
+const pnlChartConfig = {
+  cumPnl: { label: 'Cumulative P&L', color: 'hsl(var(--primary))' },
+};
+
+function PnlChart({ history, isLoading }: { history: any[] | undefined; isLoading: boolean }) {
+  const chartData = useMemo(() => {
+    if (!history?.length) return [];
+    const sorted = [...history].sort(
+      (a, b) => new Date(a.raceDate).getTime() - new Date(b.raceDate).getTime()
+    );
+    let running = 0;
+    return sorted.map((bet) => {
+      running += bet.netResult;
+      return {
+        date: bet.raceDate.split('T')[0],
+        cumPnl: parseFloat(running.toFixed(2)),
+        label: `${bet.horseName} @ ${bet.trackName}`,
+      };
+    });
+  }, [history]);
+
+  return (
+    <Card className="border-border bg-card">
+      <CardHeader className="pb-4 border-b border-border bg-secondary/20">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <TrendingUp className="size-5 text-primary" />
+          Cumulative P&amp;L
+        </CardTitle>
+        <CardDescription className="font-mono text-xs">Running profit/loss across all settled bets</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-6 pb-4 px-2">
+        {isLoading ? (
+          <Skeleton className="h-56 w-full rounded-lg" />
+        ) : chartData.length === 0 ? (
+          <div className="h-56 flex items-center justify-center text-muted-foreground text-sm">
+            No settled bets yet — chart will appear once results are recorded.
+          </div>
+        ) : (
+          <ChartContainer config={pnlChartConfig} className="h-56 w-full">
+            <LineChart data={chartData} margin={{ top: 8, right: 24, left: 8, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 10, fontFamily: 'monospace' }}
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tickFormatter={(v) => `$${v}`}
+                tick={{ fontSize: 10, fontFamily: 'monospace' }}
+                tickLine={false}
+                axisLine={false}
+                width={56}
+              />
+              <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="4 4" />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    labelFormatter={(label, payload) => {
+                      const item = payload?.[0]?.payload;
+                      return item ? `${item.date} — ${item.label}` : label;
+                    }}
+                    formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Cumulative P&L']}
+                  />
+                }
+              />
+              <Line
+                type="monotone"
+                dataKey="cumPnl"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                activeDot={{ r: 5, strokeWidth: 0 }}
+              />
+            </LineChart>
+          </ChartContainer>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
