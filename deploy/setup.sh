@@ -122,15 +122,26 @@ cd "$APP_DIR"
 
 pm2 delete ahw-api 2>/dev/null || true
 
-set -a
-source "$APP_DIR/.env.production"
-set +a
+# Write PM2 ecosystem file so env vars persist through restarts
+cat > "$APP_DIR/ecosystem.config.cjs" <<EOF
+module.exports = {
+  apps: [{
+    name: 'ahw-api',
+    script: './artifacts/api-server/dist/index.mjs',
+    cwd: '${APP_DIR}',
+    restart_delay: 3000,
+    max_restarts: 10,
+    env: {
+      NODE_ENV: 'production',
+      PORT: 8080,
+      DATABASE_URL: '${DATABASE_URL}',
+      SESSION_SECRET: '${SESSION_SECRET}'
+    }
+  }]
+};
+EOF
 
-pm2 start artifacts/api-server/dist/index.mjs \
-  --name ahw-api \
-  --restart-delay 3000 \
-  --max-restarts 10
-
+pm2 start "$APP_DIR/ecosystem.config.cjs"
 pm2 save
 sudo pm2 startup systemd -u $(whoami) --hp /home/$(whoami) | tail -1 | sudo bash 2>/dev/null || true
 
