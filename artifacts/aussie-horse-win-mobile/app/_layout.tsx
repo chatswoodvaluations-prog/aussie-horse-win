@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { keepPreviousData, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -30,6 +30,9 @@ const queryClient = new QueryClient({
       retry: 2,
       // Keep data fresh enough for 60 s polling to be meaningful.
       staleTime: 20_000,
+      // When a background refetch fails, keep the previous data visible
+      // rather than clearing it, so the screen never goes blank.
+      placeholderData: keepPreviousData,
     },
   },
 });

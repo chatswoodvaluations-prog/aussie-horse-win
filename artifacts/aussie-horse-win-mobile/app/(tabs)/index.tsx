@@ -11,6 +11,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { keepPreviousData } from '@tanstack/react-query';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { useColors } from '@/hooks/useColors';
 import { useRefreshInterval } from '@/hooks/useRefreshInterval';
 import { Feather } from '@expo/vector-icons';
@@ -230,12 +232,15 @@ export default function SelectionsScreen() {
         ))}
       </ScrollView>
 
+      {/* Offline banner — only when errored but cached data is still on-screen */}
+      {isError && nominations ? <OfflineBanner /> : null}
+
       {/* List */}
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : isError ? (
+      ) : isError && !nominations ? (
         <View style={styles.centered}>
           <Feather name="wifi-off" size={40} color={colors.mutedForeground} />
           <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>

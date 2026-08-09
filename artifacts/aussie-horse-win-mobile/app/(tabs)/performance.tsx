@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { keepPreviousData } from '@tanstack/react-query';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import {
   ActivityIndicator,
   FlatList,
@@ -195,11 +197,14 @@ export default function PerformanceScreen() {
         ))}
       </View>
 
+      {/* Offline banner — only when errored but cached data is still on-screen */}
+      {perfError && perf ? <OfflineBanner /> : null}
+
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : perfError ? (
+      ) : perfError && !perf ? (
         <View style={styles.centered}>
           <Feather name="wifi-off" size={40} color={colors.mutedForeground} />
           <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
