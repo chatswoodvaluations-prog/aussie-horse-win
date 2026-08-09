@@ -17,8 +17,10 @@ import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useGetRace, useRecordResult } from '@workspace/api-client-react';
+import { keepPreviousData } from '@tanstack/react-query';
+import { useGetRace, useRecordResult, getGetRaceQueryKey } from '@workspace/api-client-react';
 import type { Race } from '@workspace/api-client-react';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 
@@ -411,7 +413,9 @@ export default function RaceDetailScreen() {
   const insets = useSafeAreaInsets();
   const [settleRunner, setSettleRunner] = useState<Runner | null>(null);
 
-  const { data: race, isLoading, isError, refetch } = useGetRace(raceId);
+  const { data: race, isLoading, isError, refetch } = useGetRace(raceId, {
+    query: { queryKey: getGetRaceQueryKey(raceId), placeholderData: keepPreviousData },
+  });
 
   const isWeb = Platform.OS === 'web';
   const bottomPad = isWeb ? 34 : insets.bottom;
@@ -440,7 +444,7 @@ export default function RaceDetailScreen() {
     );
   }
 
-  if (isError || !race) {
+  if (!race) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', gap: 12 }]}>
         <Feather name="alert-circle" size={40} color={colors.mutedForeground} />
@@ -454,6 +458,7 @@ export default function RaceDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {isError && race ? <OfflineBanner /> : null}
       {/* Race info header */}
       <View style={[styles.raceInfoBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={styles.raceInfoRow}>
