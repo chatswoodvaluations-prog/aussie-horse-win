@@ -313,7 +313,8 @@ export const TriggerSyncResponse = zod.object({
   "runnersAdded": zod.int(),
   "nominationsGenerated": zod.int(),
   "nominationsRepriced": zod.int().default(triggerSyncResponseNominationsRepricedDefault).describe('Number of Pending nominations updated with fresh odds this sync'),
-  "message": zod.string()
+  "message": zod.string(),
+  "liveError": zod.string().optional().describe('Error from the TAB live fetch when it fell back to mock data')
 })
 
 

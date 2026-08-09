@@ -380,6 +380,7 @@ router.post("/sync", async (req, res): Promise<void> => {
   let racesAdded = 0;
   let runnersAdded = 0;
   let dataSource: "live" | "mock" = "mock";
+  let liveError: string | undefined;
 
   // ── Attempt live TAB data ──────────────────────────────────────────────────
   const states = [...new Set(tracks.map((t) => t.state))];
@@ -396,6 +397,7 @@ router.post("/sync", async (req, res): Promise<void> => {
     );
   } catch (err) {
     // ── Fall back to mock generator ──────────────────────────────────────────
+    liveError = err instanceof Error ? err.message : String(err);
     logger.warn(
       { err },
       "Sync: TAB live fetch failed — falling back to mock data generator"
@@ -528,6 +530,7 @@ router.post("/sync", async (req, res): Promise<void> => {
     nominationsGenerated: engineResult.nominationsGenerated,
     nominationsRepriced: engineResult.nominationsRepriced,
     message: `Sync complete (source: ${dataSource}). Added ${racesAdded} races and ${runnersAdded} runners. Generated ${engineResult.nominationsGenerated} new nominations. Repriced ${engineResult.nominationsRepriced} pending nominations.`,
+    ...(liveError ? { liveError } : {}),
   };
 
   logger.info(result, "Sync completed");
