@@ -122,10 +122,12 @@ cd "$APP_DIR"
 
 pm2 delete ahw-api 2>/dev/null || true
 
+set -a
+source "$APP_DIR/.env.production"
+set +a
+
 pm2 start artifacts/api-server/dist/index.mjs \
   --name ahw-api \
-  --env production \
-  --env-file "$APP_DIR/.env.production" \
   --restart-delay 3000 \
   --max-restarts 10
 
