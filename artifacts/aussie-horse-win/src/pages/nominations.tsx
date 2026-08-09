@@ -12,31 +12,23 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil, Wifi, FlaskConical, ChevronDown, ChevronUp, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const HOW_IT_WORKS_SEEN_KEY = 'ahw_how_it_works_seen';
+const LEGACY_HOW_IT_WORKS_KEY = 'ahw_how_it_works_seen';
 
 const VIDEO_URL = import.meta.env.VITE_VIDEO_URL as string | undefined;
 
 function HowItWorksBanner() {
-  const [open, setOpen] = useState(() => {
-    try {
-      return localStorage.getItem(HOW_IT_WORKS_SEEN_KEY) !== 'true';
-    } catch {
-      return true;
-    }
-  });
+  const [seen, markSeen] = useVideoSeen('how-it-works');
+  const [open, setOpen] = useState(!seen);
   const [videoAvailable, setVideoAvailable] = useState(true);
 
   useEffect(() => {
-    if (open) {
-      try {
-        localStorage.setItem(HOW_IT_WORKS_SEEN_KEY, 'true');
-      } catch {
-        // ignore
-      }
+    if (open && !seen) {
+      // Mark as seen once the user expands the banner
+      markSeen();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // If no video URL is configured for this deployment, hide the banner entirely
   const videoSrc = VIDEO_URL || '/aussie-horse-win-video/';
   if (!videoAvailable) return null;
 
@@ -523,4 +515,57 @@ function TrophyIcon(props: any) {
       <path d="M18 2H6v7c0 3.31 2.69 6 6 6s6-2.69 6-6V2Z" />
     </svg>
   );
+}
+
+/**
+ * Per-video seen-state helpers.
+ *
+ * Storage format: ahw_videos_seen → JSON array of video ID strings, e.g. ["how-it-works"]
+ *
+ * Migration: the old single-boolean key (ahw_how_it_works_seen === 'true') is read once
+ * on first access and promoted into the new set so existing visitors don't see the banner
+ * again after the upgrade.
+ */
+const VIDEOS_SEEN_KEY = 'ahw_videos_seen';
+
+function getSeenVideos(): Set<string> {
+  try {
+    const raw = localStorage.getItem(VIDEOS_SEEN_KEY);
+    const ids: string[] = raw ? JSON.parse(raw) : [];
+    const set = new Set<string>(ids);
+
+    // One-time migration: promote the old boolean flag
+    if (localStorage.getItem(LEGACY_HOW_IT_WORKS_KEY) === 'true') {
+      set.add('how-it-works');
+      localStorage.setItem(VIDEOS_SEEN_KEY, JSON.stringify([...set]));
+      localStorage.removeItem(LEGACY_HOW_IT_WORKS_KEY);
+    }
+
+    return set;
+  } catch {
+    return new Set();
+  }
+}
+
+const LEGACY_HOW_IT_WORKS_KEY = 'ahw_how_it_works_seen';
+
+function useVideoSeen(id: string): [boolean, () => void] {
+  const [seen, setSeen] = useState(() => getSeenVideos().has(id));
+
+  const markSeen = () => {
+    markVideoSeen(id);
+    setSeen(true);
+  };
+
+  return [seen, markSeen];
+}
+
+function markVideoSeen(id: string): void {
+  try {
+    const set = getSeenVideos();
+    set.add(id);
+    localStorage.setItem(VIDEOS_SEEN_KEY, JSON.stringify([...set]));
+  } catch {
+    // ignore — localStorage may be unavailable (e.g. private browsing)
+  }
 }
