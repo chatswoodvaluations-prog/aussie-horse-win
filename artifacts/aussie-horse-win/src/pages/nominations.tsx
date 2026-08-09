@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useGetNominations, useGetNominationsSummary, useRecordResult, NominationStatus, Nomination } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,8 +9,63 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil, Wifi, FlaskConical } from 'lucide-react';
+import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil, Wifi, FlaskConical, ChevronDown, ChevronUp, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const HOW_IT_WORKS_SEEN_KEY = 'ahw_how_it_works_seen';
+
+function HowItWorksBanner() {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(HOW_IT_WORKS_SEEN_KEY) !== 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    if (open) {
+      // Mark as seen once the user expands the banner
+      try {
+        localStorage.setItem(HOW_IT_WORKS_SEEN_KEY, 'true');
+      } catch {
+        // ignore
+      }
+    }
+  }, [open]);
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <button
+        onClick={() => setOpen(prev => !prev)}
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-secondary/40 transition-colors group"
+        aria-expanded={open}
+      >
+        <div className="flex items-center gap-2.5 text-sm font-mono font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+          <PlayCircle className="size-4 text-primary" />
+          <span className="uppercase tracking-wider">How it works</span>
+          <span className="text-[10px] font-normal text-muted-foreground/60 ml-1">32s explainer</span>
+        </div>
+        {open
+          ? <ChevronUp className="size-4 text-muted-foreground" />
+          : <ChevronDown className="size-4 text-muted-foreground" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-border">
+          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+            <iframe
+              src="/aussie-horse-win-video/"
+              title="How Aussie Horse Win works"
+              className="absolute inset-0 w-full h-full"
+              allow="autoplay"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Nominations() {
   const { data: nominations, isLoading: isNomsLoading } = useGetNominations();
@@ -22,6 +77,8 @@ export default function Nominations() {
         <h1 className="text-3xl font-bold tracking-tight">Weekly Nominations</h1>
         <p className="text-muted-foreground mt-2 font-mono text-sm">Strict +EV selections across regional circuits.</p>
       </header>
+
+      <HowItWorksBanner />
 
       {isSummaryLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
