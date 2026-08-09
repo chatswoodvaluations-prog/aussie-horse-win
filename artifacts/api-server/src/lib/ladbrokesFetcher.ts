@@ -19,6 +19,7 @@
 import nodeFetch from "node-fetch";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { logger } from "./logger";
+import type { LiveMeeting, LiveRace, LiveRunner, SpeedMapPosition } from "./tabFetcher";
 
 // ── SOCKS5 proxy (shared credential pattern — same as tabFetcher) ────────────
 
@@ -243,6 +244,123 @@ export async function fetchLadbrokesOdds(date: string): Promise<LadbrokesOddsMap
     "Ladbrokes: odds fetched"
   );
   return oddsMap;
+}
+
+// ── Barrier → speed-map (mirrors tabFetcher logic) ───────────────────────────
+
+function barrierToSpeedMap(barrier: number): SpeedMapPosition {
+  if (barrier <= 2) return "Lead";
+  if (barrier <= 4) return "On-Pace";
+  if (barrier <= 7) return "Handy";
+  if (barrier <= 10) return "Midfield";
+  return "Back-Marker";
+}
+
+// ── Primary race-card fetcher (Ladbrokes as TAB fallback) ────────────────────
+
+/**
+ * Fetch full race cards from Ladbrokes and return them in the same LiveMeeting
+ * format used by the TAB fetcher, so sync.ts can call insertLiveRaceCards
+ * without any changes.
+ *
+ * Used when the TAB API is unavailable (e.g. datacenter IP block).
+ * Re-throws on network failure so the caller can fall back to mock data.
+ */
+export async function fetchLiveRaceCardsFromLadbrokes(
+  dates: string[],
+  states: string[]
+): Promise<{ meetings: LiveMeeting[]; source: "ladbrokes" }> {
+  const stateSet = new Set(states);
+  const all: LiveMeeting[] = [];
+
+  for (const date of dates) {
+    const overviewUrl = `${LADS_BASE}/racing-overview?date=${date}&type=R`;
+    let overviewRaw: LadbrokesOverviewResponse;
+
+    try {
+      overviewRaw = (await fetchJson(overviewUrl)) as LadbrokesOverviewResponse;
+    } catch (err) {
+      logger.warn({ date, err }, "Ladbrokes primary: overview fetch failed");
+      throw err;
+    }
+
+    // Fill in event cards for races that don't have embedded runners yet
+    const overview = await fillEventCards(overviewRaw);
+
+    for (const meeting of overview.meetings ?? []) {
+      if (meeting.race_type && meeting.race_type !== "R") continue;
+
+      const venueName = meeting.venue_name ?? meeting.name ?? "";
+      const venueState = meeting.state ?? "";
+      if (!venueName) continue;
+
+      // Only include states that have enabled tracks
+      if (stateSet.size > 0 && venueState && !stateSet.has(venueState)) continue;
+
+      const races: LiveRace[] = [];
+
+      for (const race of meeting.races ?? []) {
+        const raceNumber = race.number;
+        if (!raceNumber) continue;
+
+        const runners: LiveRunner[] = [];
+
+        for (const runner of race.runners ?? []) {
+          if (runner.scratched) continue;
+          if (!runner.name) continue;
+
+          const winOdds = runner.fixed_odds?.win_odds;
+          const placeOdds = runner.fixed_odds?.place_odds;
+
+          if (
+            !winOdds ||
+            !placeOdds ||
+            runner.fixed_odds?.is_suspended ||
+            winOdds <= 0 ||
+            placeOdds <= 0
+          ) continue;
+
+          const barrier = runner.number ?? 1;
+
+          runners.push({
+            horseName: normaliseKey(runner.name),
+            barrierNumber: barrier,
+            speedMapPosition: barrierToSpeedMap(barrier),
+            winOdds: Math.round(winOdds * 100) / 100,
+            placeOdds: Math.round(placeOdds * 100) / 100,
+            jockey: "Unknown",
+            trainer: "Unknown",
+          });
+        }
+
+        if (runners.length === 0) continue;
+
+        races.push({
+          raceNumber,
+          raceName: `Race ${raceNumber}`,
+          raceDate: date,
+          raceTime: "12:00",
+          fieldSize: runners.length,
+          distance: 1200,
+          runners,
+        });
+      }
+
+      if (races.length > 0) {
+        all.push({ venueName, venueState, races });
+        logger.info(
+          { date, venue: venueName, races: races.length },
+          "Ladbrokes primary: fetched meeting"
+        );
+      }
+    }
+  }
+
+  if (all.length === 0) {
+    throw new Error("Ladbrokes primary: no meetings found for requested dates/states");
+  }
+
+  return { meetings: all, source: "ladbrokes" };
 }
 
 /**

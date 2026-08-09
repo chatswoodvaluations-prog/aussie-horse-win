@@ -5,7 +5,7 @@ import { db, tracksTable, racesTable, runnersTable, nominationsTable } from "@wo
 import { and, eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { fetchLiveRaceCards, getSydneyDateStrings, type LiveMeeting } from "../lib/tabFetcher";
-import { fetchLadbrokesOdds, normaliseKey as normaliseForLadbrokes, type LadbrokesOddsMap } from "../lib/ladbrokesFetcher";
+import { fetchLiveRaceCardsFromLadbrokes, fetchLadbrokesOdds, normaliseKey as normaliseForLadbrokes, type LadbrokesOddsMap } from "../lib/ladbrokesFetcher";
 import { sendNominationAlert, type NominationSummaryRow } from "../lib/emailService";
 import { upsertRaceRunners, makeDrizzleUpsertDb } from "../lib/raceUpsert";
 
@@ -379,7 +379,7 @@ router.post("/sync", async (req, res): Promise<void> => {
 
   let racesAdded = 0;
   let runnersAdded = 0;
-  let dataSource: "live" | "mock" = "mock";
+  let dataSource: "live" | "ladbrokes" | "mock" = "mock";
   let liveError: string | undefined;
 
   // ── Attempt live TAB data ──────────────────────────────────────────────────
@@ -395,17 +395,30 @@ router.post("/sync", async (req, res): Promise<void> => {
       { racesAdded, runnersAdded, runnersUpdated: counts.runnersUpdated },
       "Sync: live TAB data inserted successfully"
     );
-  } catch (err) {
-    // ── Fall back to mock generator ──────────────────────────────────────────
-    liveError = err instanceof Error ? err.message : String(err);
-    logger.warn(
-      { err },
-      "Sync: TAB live fetch failed — falling back to mock data generator"
-    );
-    const counts = await insertMockRaceCards(tracks, dates);
-    racesAdded = counts.racesAdded;
-    runnersAdded = counts.runnersAdded;
-    dataSource = "mock";
+  } catch (tabErr) {
+    // ── TAB failed — try Ladbrokes as primary source ───────────────────────
+    const tabErrMsg = tabErr instanceof Error ? tabErr.message : String(tabErr);
+    logger.warn({ err: tabErr }, "Sync: TAB fetch failed — trying Ladbrokes");
+
+    try {
+      const { meetings } = await fetchLiveRaceCardsFromLadbrokes(dates, states);
+      const counts = await insertLiveRaceCards(meetings, tracks);
+      racesAdded = counts.racesAdded;
+      runnersAdded = counts.runnersAdded;
+      dataSource = "ladbrokes";
+      logger.info(
+        { racesAdded, runnersAdded, runnersUpdated: counts.runnersUpdated },
+        "Sync: Ladbrokes data inserted successfully"
+      );
+    } catch (ladsErr) {
+      // ── Both live sources failed — fall back to mock ─────────────────────
+      liveError = `TAB: ${tabErrMsg} | Ladbrokes: ${ladsErr instanceof Error ? ladsErr.message : String(ladsErr)}`;
+      logger.warn({ tabErr, ladsErr }, "Sync: both live sources failed — falling back to mock");
+      const counts = await insertMockRaceCards(tracks, dates);
+      racesAdded = counts.racesAdded;
+      runnersAdded = counts.runnersAdded;
+      dataSource = "mock";
+    }
   }
 
   // ── Fetch and store Ladbrokes odds (best-effort, bounded 30 s total) ────────
