@@ -17,6 +17,7 @@ import { useColors } from '@/hooks/useColors';
 import { useRefreshInterval } from '@/hooks/useRefreshInterval';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
 import {
   useGetNominations,
   useGetNominationsSummary,
@@ -62,12 +63,13 @@ function StatusBadge({ status }: { status: Nomination['status'] }) {
 }
 
 function shareNomination(item: Nomination) {
+  const deepLink = Linking.createURL(`race/${item.raceId}`);
   const message =
     `🏇 ${item.horseName}\n` +
     `📍 ${item.trackName} · Race ${item.raceNumber} · ${item.raceDate}\n` +
     `Win $${item.winOdds.toFixed(1)} · Place $${item.placeOdds.toFixed(1)}\n` +
     `Barrier ${item.barrierNumber} · Outlay $${item.totalOutlay.toFixed(0)}\n` +
-    `— Aussie Horse Win`;
+    `— Aussie Horse Win\n${deepLink}`;
   Share.share({ message });
 }
 

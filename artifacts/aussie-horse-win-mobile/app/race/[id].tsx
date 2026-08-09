@@ -20,6 +20,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useGetRace, useRecordResult } from '@workspace/api-client-react';
 import type { Race } from '@workspace/api-client-react';
 import * as Haptics from 'expo-haptics';
+import * as Linking from 'expo-linking';
 
 type Runner = Race['runners'][number];
 
@@ -283,6 +284,7 @@ function SettleModal({
 }
 
 function shareRunner(runner: Runner, race: Race) {
+  const deepLink = Linking.createURL(`race/${race.id}`);
   const message =
     `🏇 ${runner.horseName}\n` +
     `📍 ${race.trackName} · Race ${race.raceNumber}` +
@@ -290,7 +292,7 @@ function shareRunner(runner: Runner, race: Race) {
     `Win $${runner.winOdds.toFixed(1)} · Place $${runner.placeOdds.toFixed(1)}\n` +
     `Barrier ${runner.barrierNumber}` +
     (race.distance ? ` · ${race.distance}m` : '') + '\n' +
-    `— Aussie Horse Win`;
+    `— Aussie Horse Win\n${deepLink}`;
   Share.share({ message });
 }
 
