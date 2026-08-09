@@ -280,8 +280,10 @@ export async function fetchLiveRaceCardsFromLadbrokes(
     try {
       overviewRaw = (await fetchJson(overviewUrl)) as LadbrokesOverviewResponse;
     } catch (err) {
-      logger.warn({ date, err }, "Ladbrokes primary: overview fetch failed");
-      throw err;
+      // HTTP 500 / no data for this date is normal when fields aren't posted yet.
+      // Skip this date and try the next — only abort if every date fails.
+      logger.warn({ date, err }, "Ladbrokes primary: no data for date — skipping");
+      continue;
     }
 
     // Fill in event cards for races that don't have embedded runners yet
