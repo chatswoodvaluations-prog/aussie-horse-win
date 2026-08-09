@@ -6,6 +6,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -41,6 +42,16 @@ function StatusBadge({ status }: { status: Nomination['status'] }) {
   );
 }
 
+function shareNomination(item: Nomination) {
+  const message =
+    `🏇 ${item.horseName}\n` +
+    `📍 ${item.trackName} · Race ${item.raceNumber} · ${item.raceDate}\n` +
+    `Win $${item.winOdds.toFixed(1)} · Place $${item.placeOdds.toFixed(1)}\n` +
+    `Barrier ${item.barrierNumber} · Outlay $${item.totalOutlay.toFixed(0)}\n` +
+    `— Aussie Horse Win`;
+  Share.share({ message });
+}
+
 function NominationCard({ item }: { item: Nomination }) {
   const colors = useColors();
   const isPending = item.status === 'Pending';
@@ -61,7 +72,16 @@ function NominationCard({ item }: { item: Nomination }) {
             {item.trackName} · R{item.raceNumber} · {item.raceDate}
           </Text>
         </View>
-        <StatusBadge status={item.status} />
+        <View style={styles.cardHeaderRight}>
+          <Pressable
+            onPress={() => shareNomination(item)}
+            hitSlop={10}
+            style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+          >
+            <Feather name="share-2" size={16} color={colors.mutedForeground} />
+          </Pressable>
+          <StatusBadge status={item.status} />
+        </View>
       </View>
 
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -320,6 +340,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   horseName: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
   raceInfo: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 2 },
   divider: { height: 1, marginVertical: 10 },

@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -281,15 +282,29 @@ function SettleModal({
   );
 }
 
+function shareRunner(runner: Runner, race: Race) {
+  const message =
+    `🏇 ${runner.horseName}\n` +
+    `📍 ${race.trackName} · Race ${race.raceNumber}` +
+    (race.raceTime ? ` · ${race.raceTime}` : '') + '\n' +
+    `Win $${runner.winOdds.toFixed(1)} · Place $${runner.placeOdds.toFixed(1)}\n` +
+    `Barrier ${runner.barrierNumber}` +
+    (race.distance ? ` · ${race.distance}m` : '') + '\n' +
+    `— Aussie Horse Win`;
+  Share.share({ message });
+}
+
 function RunnerCard({
   runner,
   isNominated,
   onSettle,
+  onShare,
   colors,
 }: {
   runner: Runner;
   isNominated: boolean;
   onSettle: (runner: Runner) => void;
+  onShare: (runner: Runner) => void;
   colors: ReturnType<typeof useColors>;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -356,20 +371,32 @@ function RunnerCard({
         </View>
       )}
 
-      {/* Settle button for nominated runners */}
+      {/* Action buttons for nominated runners */}
       {isNominated && (
-        <Pressable
-          onPress={() => onSettle(runner)}
-          style={({ pressed }) => [
-            styles.settleBtn,
-            { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 },
-          ]}
-        >
-          <Feather name="check-square" size={14} color={colors.primaryForeground} />
-          <Text style={[styles.settleBtnText, { color: colors.primaryForeground }]}>
-            Settle
-          </Text>
-        </Pressable>
+        <View style={styles.runnerActions}>
+          <Pressable
+            onPress={() => onShare(runner)}
+            style={({ pressed }) => [
+              styles.shareBtn,
+              { backgroundColor: colors.secondary, opacity: pressed ? 0.8 : 1 },
+            ]}
+          >
+            <Feather name="share-2" size={14} color={colors.foreground} />
+            <Text style={[styles.shareBtnText, { color: colors.foreground }]}>Share</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => onSettle(runner)}
+            style={({ pressed }) => [
+              styles.settleBtn,
+              { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 },
+            ]}
+          >
+            <Feather name="check-square" size={14} color={colors.primaryForeground} />
+            <Text style={[styles.settleBtnText, { color: colors.primaryForeground }]}>
+              Settle
+            </Text>
+          </Pressable>
+        </View>
       )}
     </View>
   );
@@ -473,6 +500,7 @@ export default function RaceDetailScreen() {
             runner={item}
             isNominated={nominatedRunnerIds.has(item.id)}
             onSettle={setSettleRunner}
+            onShare={(runner) => shareRunner(runner, race)}
             colors={colors}
           />
         )}
@@ -551,13 +579,28 @@ const styles = StyleSheet.create({
   filterRule: { fontFamily: 'Inter_500Medium', fontSize: 12 },
   filterMsg: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 1 },
   jockeyText: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 4 },
-  settleBtn: {
+  runnerActions: {
+    flexDirection: 'row',
+    gap: 8,
+    margin: 10,
+    marginTop: 0,
+  },
+  shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    margin: 10,
-    marginTop: 0,
+    paddingVertical: 9,
+    borderRadius: 6,
+    paddingHorizontal: 14,
+  },
+  shareBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  settleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     paddingVertical: 9,
     borderRadius: 6,
   },
