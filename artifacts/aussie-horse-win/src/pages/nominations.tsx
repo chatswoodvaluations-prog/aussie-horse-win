@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil, Wifi, FlaskConical, ChevronDown, ChevronUp, PlayCircle } from 'lucide-react';
+import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil, Wifi, FlaskConical, ChevronDown, ChevronUp, PlayCircle, Share2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const LEGACY_HOW_IT_WORKS_KEY = 'ahw_how_it_works_seen';
@@ -172,10 +172,36 @@ function NominationCard({ nom }: { nom: Nomination }) {
   const [finishPosition, setFinishPosition] = useState('');
   const [winReturn, setWinReturn] = useState('');
   const [placeReturn, setPlaceReturn] = useState('');
+  const [copied, setCopied] = useState(false);
   const recordResult = useRecordResult();
   const queryClient = useQueryClient();
   // Guard against double-submission: tracks whether a request is already in-flight
   const isSubmittingRef = useRef(false);
+
+  const shareText = [
+    `🏇 ${nom.horseName}`,
+    `📍 ${nom.trackName} — Race ${nom.raceNumber}`,
+    `Win: $${nom.winOdds.toFixed(2)} | Place: $${nom.placeOdds.toFixed(2)}`,
+    `📅 ${nom.raceDate.split('T')[0]}`,
+  ].join('\n');
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: shareText });
+        return;
+      } catch {
+        // User cancelled or share failed — fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy to clipboard');
+    }
+  };
 
   const isPending = nom.status === NominationStatus.Pending;
   const isWon = nom.status === NominationStatus.Won;
@@ -263,6 +289,20 @@ function NominationCard({ nom }: { nom: Nomination }) {
                 </Badge>
               ) : null}
             </div>
+
+            {/* Share / copy tip */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleShare}
+              title={copied ? 'Copied!' : 'Share tip'}
+              className={cn(
+                "h-6 w-6 p-0 text-muted-foreground hover:text-foreground",
+                copied && "text-primary"
+              )}
+            >
+              {copied ? <Check className="size-3.5" /> : <Share2 className="size-3.5" />}
+            </Button>
 
             {/* SETTLE for pending, EDIT RESULT for settled */}
             <Dialog open={open} onOpenChange={handleCloseDialog}>
