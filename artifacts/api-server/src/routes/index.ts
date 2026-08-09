@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import debugRouter from "./debug";
 import tracksRouter from "./tracks";
 import racesRouter from "./races";
 import nominationsRouter from "./nominations";
@@ -11,6 +12,7 @@ import videoRouter from "./video";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(debugRouter);
 router.use(tracksRouter);
 router.use(racesRouter);
 router.use(nominationsRouter);
