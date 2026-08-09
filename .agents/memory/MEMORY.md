@@ -1,0 +1,1 @@
+- [Oracle VPS deployment](oracle-vps.md) — Oracle Cloud Sydney server at 149.118.66.37; SSH key is "ssh-key-2026-08-09 (2).key" in Cloud Shell home
