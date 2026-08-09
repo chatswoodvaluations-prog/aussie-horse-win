@@ -9,6 +9,14 @@
  *   3. After the selection engine runs, no duplicate nominations exist.
  *   4. New runners carry real TAB identifiers, not mock names.
  *
+ * A second suite ("upsert contract") verifies the actual insertLiveRaceCards
+ * upsert path — runner IDs are preserved across odds refreshes, so settled
+ * nominations remain linked:
+ *   5. Won nomination still references the same runner ID after an odds refresh.
+ *   6. Runner row is retained when it has completed (Won/Placed/Unplaced) noms.
+ *   7. Scratched runner with only Pending noms has those noms deleted, then the
+ *      runner row itself is removed.
+ *
  * The test uses an in-memory store in place of the real PostgreSQL db so
  * it runs without a database connection.
  *
@@ -17,6 +25,7 @@
 
 import { describe, it, mock, before } from "node:test";
 import assert from "node:assert/strict";
+import { upsertRaceRunners, type RunnerUpsertDb } from "../lib/raceUpsert.js";
 
 // ── In-memory store ──────────────────────────────────────────────────────────
 
@@ -248,5 +257,243 @@ describe("live replacement — persistence / nomination cleanup", () => {
         `nomination ${nom.id} references stale runner ${nom.runnerId}`
       );
     }
+  });
+});
+
+// ── Upsert contract tests ─────────────────────────────────────────────────────
+//
+// These tests exercise the REAL upsertRaceRunners production function from
+// lib/raceUpsert.ts via an in-memory RunnerUpsertDb adapter.
+// The adapter satisfies the same interface the production Drizzle adapter
+// implements, so every branch of the production code runs — not a simulation.
+
+/**
+ * Build a RunnerUpsertDb adapter backed by in-memory Table instances.
+ * Satisfies the same interface the Drizzle production adapter implements.
+ */
+function makeInMemoryUpsertDb(
+  uRunners: Table<RunnerRow>,
+  uNominations: Table<NominationRow>
+): RunnerUpsertDb {
+  return {
+    async getRunnersForRace(raceId) {
+      return uRunners.select((r) => r.raceId === raceId).map((r) => ({
+        id: r.id,
+        horseName: r.horseName,
+        jockey: r.jockey,
+        trainer: r.trainer,
+      }));
+    },
+
+    async updateRunner(id, data) {
+      uRunners.update((r) => r.id === id, data as Partial<RunnerRow>);
+    },
+
+    async insertRunner(data) {
+      const row = uRunners.insert({
+        raceId: data.raceId,
+        horseName: data.horseName,
+        barrierNumber: data.barrierNumber,
+        speedMapPosition: data.speedMapPosition,
+        winOdds: data.winOdds,
+        placeOdds: data.placeOdds,
+        jockey: data.jockey ?? "",
+        trainer: data.trainer ?? "",
+        passed: data.passed,
+        filterResults: data.filterResults,
+      });
+      return { id: row.id };
+    },
+
+    async deletePendingNominations(runnerId) {
+      uNominations.delete((n) => n.runnerId === runnerId && n.status === "Pending");
+    },
+
+    async getNominations(runnerId) {
+      return uNominations.select((n) => n.runnerId === runnerId).map((n) => ({
+        id: n.id,
+        status: n.status,
+      }));
+    },
+
+    async deleteRunner(id) {
+      uRunners.delete((r) => r.id === id);
+    },
+  };
+}
+
+describe("upsert contract — runner ID preservation and scratching rules (production code)", () => {
+  // Independent in-memory tables so state doesn't bleed from the first suite.
+  const uRunners     = new Table<RunnerRow>();
+  const uNominations = new Table<NominationRow>();
+
+  let raceId: number;
+  let originalRunnerId: number;
+  let wonNominationId: number;
+  let scratchedWithNomId: number;
+  let scratchedNoNomId: number;
+  let scratchedPendingOnlyId: number;
+
+  // Seed state then run the REAL upsertRaceRunners production function.
+  before(async () => {
+    raceId = 1; // arbitrary; used only as a filter key in the in-memory store
+
+    // Runner that will stay in the field (with updated odds on next sync)
+    const stayer = uRunners.insert({
+      raceId, horseName: "Stayer Horse", barrierNumber: 2,
+      speedMapPosition: "Lead", winOdds: 6.0, placeOdds: 2.1,
+      jockey: "J. McDonald", trainer: "C. Waller",
+      passed: true, filterResults: "[]",
+    });
+    originalRunnerId = stayer.id;
+
+    // Won nomination linked to the stayer — must survive odds refresh intact
+    const wonNom = uNominations.insert({
+      raceId, runnerId: stayer.id,
+      trackName: "Flemington", state: "VIC",
+      raceNumber: 3, raceName: "Race 3 - 1600m",
+      raceDate: "2026-08-09", raceTime: "14:30",
+      horseName: "Stayer Horse", barrierNumber: 2,
+      speedMapPosition: "Lead", winOdds: 6.0, placeOdds: 2.1,
+      winStake: 5, placeStake: 20, totalOutlay: 25,
+      projectedWinReturn: 5 * 6.0 + 20 * 2.1,
+      projectedPlaceReturn: 20 * 2.1,
+      jockey: "J. McDonald", trainer: "C. Waller",
+      status: "Won",
+    });
+    wonNominationId = wonNom.id;
+
+    // Scratched runner with a completed (Placed) nomination — must keep its row
+    const scratchedWithNom = uRunners.insert({
+      raceId, horseName: "Scratched With History", barrierNumber: 5,
+      speedMapPosition: "Handy", winOdds: 9.0, placeOdds: 2.8,
+      jockey: "D. Lane", trainer: "P. Moody",
+      passed: false, filterResults: "[]",
+    });
+    scratchedWithNomId = scratchedWithNom.id;
+    uNominations.insert({
+      raceId, runnerId: scratchedWithNom.id,
+      trackName: "Flemington", state: "VIC",
+      raceNumber: 3, raceName: "Race 3 - 1600m",
+      raceDate: "2026-08-09", raceTime: "14:30",
+      horseName: "Scratched With History", barrierNumber: 5,
+      speedMapPosition: "Handy", winOdds: 9.0, placeOdds: 2.8,
+      winStake: 5, placeStake: 20, totalOutlay: 25,
+      projectedWinReturn: 5 * 9.0 + 20 * 2.8,
+      projectedPlaceReturn: 20 * 2.8,
+      jockey: "D. Lane", trainer: "P. Moody",
+      status: "Placed",
+    });
+
+    // Scratched runner with no nominations at all — row must be deleted
+    const scratchedNoNom = uRunners.insert({
+      raceId, horseName: "Scratched No Nom", barrierNumber: 8,
+      speedMapPosition: "Back-Marker", winOdds: 12.0, placeOdds: 3.5,
+      jockey: "B. Shinn", trainer: "T. McEvoy",
+      passed: false, filterResults: "[]",
+    });
+    scratchedNoNomId = scratchedNoNom.id;
+
+    // Scratched runner with only a Pending nomination — pending deleted, row deleted
+    const scratchedPendingOnly = uRunners.insert({
+      raceId, horseName: "Scratched Pending Only", barrierNumber: 9,
+      speedMapPosition: "Midfield", winOdds: 7.5, placeOdds: 2.4,
+      jockey: "H. Bowman", trainer: "G. Waterhouse",
+      passed: false, filterResults: "[]",
+    });
+    scratchedPendingOnlyId = scratchedPendingOnly.id;
+    uNominations.insert({
+      raceId, runnerId: scratchedPendingOnly.id,
+      trackName: "Flemington", state: "VIC",
+      raceNumber: 3, raceName: "Race 3 - 1600m",
+      raceDate: "2026-08-09", raceTime: "14:30",
+      horseName: "Scratched Pending Only", barrierNumber: 9,
+      speedMapPosition: "Midfield", winOdds: 7.5, placeOdds: 2.4,
+      winStake: 5, placeStake: 20, totalOutlay: 25,
+      projectedWinReturn: 5 * 7.5 + 20 * 2.4,
+      projectedPlaceReturn: 20 * 2.4,
+      jockey: "H. Bowman", trainer: "G. Waterhouse",
+      status: "Pending",
+    });
+
+    // ── Run the PRODUCTION upsertRaceRunners via an in-memory adapter ──────────
+    // Only "Stayer Horse" stays in the TAB field, with updated odds.
+    // The other three runners are absent (scratched).
+    await upsertRaceRunners(
+      raceId,
+      [
+        {
+          horseName: "Stayer Horse",
+          barrierNumber: 2,
+          speedMapPosition: "Lead",
+          winOdds: 7.5,   // odds drifted up
+          placeOdds: 2.4,
+          jockey: "J. McDonald",
+          trainer: "C. Waller",
+        },
+      ],
+      makeInMemoryUpsertDb(uRunners, uNominations)
+    );
+  });
+
+  it("runner ID is preserved after an odds refresh", () => {
+    const stayer = uRunners.select((r) => r.horseName === "Stayer Horse")[0];
+    assert.ok(stayer, "stayer runner must still exist in the DB");
+    assert.equal(
+      stayer.id,
+      originalRunnerId,
+      "runner ID must not change across an odds refresh — upsertRaceRunners must update in-place, not delete-and-reinsert"
+    );
+  });
+
+  it("odds are updated on the preserved runner row", () => {
+    const stayer = uRunners.select((r) => r.horseName === "Stayer Horse")[0];
+    assert.equal(stayer.winOdds, 7.5, "win odds must reflect fresh TAB value");
+    assert.equal(stayer.placeOdds, 2.4, "place odds must reflect fresh TAB value");
+  });
+
+  it("Won nomination still references the original runner ID after odds refresh", () => {
+    const wonNom = uNominations.select((n) => n.id === wonNominationId)[0];
+    assert.ok(wonNom, "Won nomination must not be deleted");
+    assert.equal(
+      wonNom.runnerId,
+      originalRunnerId,
+      "Won nomination must still link to the same runner ID"
+    );
+    assert.equal(wonNom.status, "Won", "Won nomination status must be unchanged");
+    // Settled odds must not be mutated — they reflect the market at bet-time
+    assert.equal(wonNom.winOdds, 6.0, "Won nomination winOdds must remain at original bet-time value");
+  });
+
+  it("scratched runner with completed nomination retains its row", () => {
+    const row = uRunners.select((r) => r.id === scratchedWithNomId)[0];
+    assert.ok(
+      row,
+      "runner with a completed (Placed) nomination must not be deleted when scratched"
+    );
+    const placedNom = uNominations.select(
+      (n) => n.runnerId === scratchedWithNomId && n.status === "Placed"
+    )[0];
+    assert.ok(placedNom, "Placed nomination for scratched runner must be preserved");
+  });
+
+  it("scratched runner with no nominations is removed", () => {
+    const row = uRunners.select((r) => r.id === scratchedNoNomId)[0];
+    assert.equal(row, undefined, "scratched runner with no nominations must be deleted");
+  });
+
+  it("scratched runner with only Pending nominations has noms deleted then row removed", () => {
+    const row = uRunners.select((r) => r.id === scratchedPendingOnlyId)[0];
+    assert.equal(
+      row,
+      undefined,
+      "scratched runner with only Pending nominations must be deleted after noms are cleared"
+    );
+    const remainingNoms = uNominations.select((n) => n.runnerId === scratchedPendingOnlyId);
+    assert.equal(
+      remainingNoms.length,
+      0,
+      "Pending nomination for scratched runner must be cleaned up before row is removed"
+    );
   });
 });
