@@ -115,10 +115,9 @@ async function insertLiveRaceCards(
       let raceId: number;
 
       if (existingRaces.length > 0) {
-        // Race already exists (possibly seeded with mock data).
-        // Replace it completely: delete all current runners and re-insert the
-        // authoritative TAB runner set.  This prevents mock horse names / odds
-        // from persisting alongside live market data.
+        // Race already exists — update odds in-place so the selection engine
+        // can re-evaluate with fresh market prices.  Runner IDs are preserved
+        // so historical nominations (Won/Placed/Unplaced) remain linked.
         raceId = existingRaces[0].id;
 
         // Update race-level metadata (time, distance, field size) from TAB
@@ -133,42 +132,92 @@ async function insertLiveRaceCards(
           })
           .where(eq(racesTable.id, raceId));
 
-        // Remove pending nominations that reference the soon-to-be-deleted runners.
-        // Historical records (Won, Placed, Unplaced) are preserved — they represent
-        // completed bets and must not be discarded.
-        const staleRunners = await db
+        // Fetch current runners for this race so we can diff against TAB data
+        const existingRunners = await db
           .select()
           .from(runnersTable)
           .where(eq(runnersTable.raceId, raceId));
-        for (const staleRunner of staleRunners) {
+
+        // Build a lookup keyed by lower-cased horse name for fast matching
+        const existingByName = new Map(
+          existingRunners.map((r) => [r.horseName.toLowerCase(), r])
+        );
+
+        const seenRunnerIds = new Set<number>();
+
+        for (const tabRunner of race.runners) {
+          const existing = existingByName.get(tabRunner.horseName.toLowerCase());
+
+          if (existing) {
+            // Runner already in DB — update odds and reset filter evaluation
+            // so the selection engine picks up the fresh prices.
+            await db
+              .update(runnersTable)
+              .set({
+                winOdds: tabRunner.winOdds,
+                placeOdds: tabRunner.placeOdds,
+                barrierNumber: tabRunner.barrierNumber,
+                speedMapPosition: tabRunner.speedMapPosition,
+                jockey: tabRunner.jockey ?? existing.jockey,
+                trainer: tabRunner.trainer ?? existing.trainer,
+                // Reset so runSelectionEngine re-evaluates with fresh odds
+                passed: false,
+                filterResults: "[]",
+              })
+              .where(eq(runnersTable.id, existing.id));
+
+            seenRunnerIds.add(existing.id);
+            runnersUpdated++;
+          } else {
+            // New scratching replacement or late entry — insert fresh
+            const [inserted] = await db
+              .insert(runnersTable)
+              .values({
+                raceId,
+                horseName: tabRunner.horseName,
+                barrierNumber: tabRunner.barrierNumber,
+                speedMapPosition: tabRunner.speedMapPosition,
+                winOdds: tabRunner.winOdds,
+                placeOdds: tabRunner.placeOdds,
+                jockey: tabRunner.jockey,
+                trainer: tabRunner.trainer,
+                passed: false,
+                filterResults: "[]",
+              })
+              .returning();
+
+            seenRunnerIds.add(inserted.id);
+            runnersAdded++;
+          }
+        }
+
+        // Remove runners that are no longer in the TAB field (scratched).
+        // Only delete runners that have no completed nominations — pending
+        // nominations are also removed since the runner is gone.
+        for (const stale of existingRunners) {
+          if (seenRunnerIds.has(stale.id)) continue;
+
+          // Delete any pending nominations for this scratched runner
           await db
             .delete(nominationsTable)
             .where(
               and(
-                eq(nominationsTable.runnerId, staleRunner.id),
+                eq(nominationsTable.runnerId, stale.id),
                 eq(nominationsTable.status, "Pending")
               )
             );
-        }
 
-        // Remove all existing runners for this race
-        await db.delete(runnersTable).where(eq(runnersTable.raceId, raceId));
+          // Only remove the runner row if there are no historical records
+          const completedNoms = await db
+            .select()
+            .from(nominationsTable)
+            .where(eq(nominationsTable.runnerId, stale.id));
 
-        // Insert the real TAB runners
-        for (const runner of race.runners) {
-          await db.insert(runnersTable).values({
-            raceId,
-            horseName: runner.horseName,
-            barrierNumber: runner.barrierNumber,
-            speedMapPosition: runner.speedMapPosition,
-            winOdds: runner.winOdds,
-            placeOdds: runner.placeOdds,
-            jockey: runner.jockey,
-            trainer: runner.trainer,
-            passed: false,
-            filterResults: "[]",
-          });
-          runnersUpdated++;
+          if (completedNoms.length === 0) {
+            await db
+              .delete(runnersTable)
+              .where(eq(runnersTable.id, stale.id));
+          }
         }
       } else {
         // New race — insert race record and all runners
