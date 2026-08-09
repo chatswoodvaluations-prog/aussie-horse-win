@@ -38,7 +38,19 @@ echo ""
 echo "Got it. Setting up your server now — this takes about 5 minutes."
 echo ""
 
-# ── 2. System packages ────────────────────────────────────────────────────────
+# ── 2. Swap file (critical for 1 GB RAM instances) ───────────────────────────
+step "Setting up swap memory (helps on small servers)"
+if [ ! -f /swapfile ]; then
+  sudo fallocate -l 2G /swapfile
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile
+  sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+  echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+  sudo sysctl -p
+fi
+
+# ── 3. System packages ────────────────────────────────────────────────────────
 step "Updating system packages"
 sudo apt-get update -qq
 sudo apt-get upgrade -y -qq
