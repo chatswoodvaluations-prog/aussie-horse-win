@@ -28,6 +28,23 @@ import type { Nomination } from '@workspace/api-client-react';
 type StatusFilter = 'All' | 'Pending' | 'Won' | 'Placed' | 'Unplaced';
 const STATUS_FILTERS: StatusFilter[] = ['All', 'Pending', 'Won', 'Placed', 'Unplaced'];
 
+function DataSourceBadge({ dataSource }: { dataSource: Nomination['dataSource'] }) {
+  const colors = useColors();
+  if (!dataSource) return null;
+  const isLive = dataSource === 'live';
+  return (
+    <View style={[
+      styles.dataSourceBadge,
+      { backgroundColor: isLive ? '#002E11' : colors.muted },
+    ]}>
+      <View style={[styles.dataSourceDot, { backgroundColor: isLive ? colors.primary : colors.mutedForeground }]} />
+      <Text style={[styles.dataSourceText, { color: isLive ? colors.primary : colors.mutedForeground }]}>
+        {isLive ? 'Live TAB odds' : 'Simulated'}
+      </Text>
+    </View>
+  );
+}
+
 function StatusBadge({ status }: { status: Nomination['status'] }) {
   const colors = useColors();
   const badgeColors: Record<Nomination['status'], { bg: string; text: string }> = {
@@ -106,13 +123,16 @@ function NominationCard({ item }: { item: Nomination }) {
         )}
       </View>
 
-      {item.speedMapPosition ? (
-        <View style={[styles.posTag, { backgroundColor: colors.muted }]}>
-          <Text style={[styles.posTagText, { color: colors.mutedForeground }]}>
-            {item.speedMapPosition}
-          </Text>
-        </View>
-      ) : null}
+      <View style={styles.cardFooter}>
+        {item.speedMapPosition ? (
+          <View style={[styles.posTag, { backgroundColor: colors.muted }]}>
+            <Text style={[styles.posTagText, { color: colors.mutedForeground }]}>
+              {item.speedMapPosition}
+            </Text>
+          </View>
+        ) : null}
+        <DataSourceBadge dataSource={item.dataSource} />
+      </View>
     </View>
   );
 }
@@ -353,14 +373,35 @@ const styles = StyleSheet.create({
   statItem: { minWidth: 48 },
   statLabel: { fontFamily: 'Inter_400Regular', fontSize: 11 },
   statValue: { fontFamily: 'Inter_600SemiBold', fontSize: 13, marginTop: 1 },
+  cardFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+    alignItems: 'center',
+  },
   posTag: {
     alignSelf: 'flex-start',
-    marginTop: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
   },
   posTagText: { fontFamily: 'Inter_400Regular', fontSize: 11 },
+  dataSourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  dataSourceDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  dataSourceText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
