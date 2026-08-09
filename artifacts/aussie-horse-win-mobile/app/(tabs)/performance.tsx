@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { keepPreviousData } from '@tanstack/react-query';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { StaleBanner } from '@/components/StaleBanner';
+import { useStaleBanner } from '@/hooks/useStaleBanner';
 import {
   ActivityIndicator,
   FlatList,
@@ -119,6 +121,7 @@ export default function PerformanceScreen() {
     isError: perfError,
     refetch: refetchPerf,
     isRefetching: perfRefetching,
+    failureCount: perfFailureCount,
   } = useGetPerformance();
 
   const {
@@ -134,6 +137,8 @@ export default function PerformanceScreen() {
     refetch: refetchTracks,
     isRefetching: tracksRefetching,
   } = useGetTrackBreakdown();
+
+  const { showBanner: showStaleBanner, dismiss: dismissStaleBanner } = useStaleBanner(perfFailureCount, perfError);
 
   const isWeb = Platform.OS === 'web';
   const topPad = isWeb ? 67 : insets.top;
@@ -199,6 +204,10 @@ export default function PerformanceScreen() {
 
       {/* Offline banner — only when errored but cached data is still on-screen */}
       {perfError && perf ? <OfflineBanner /> : null}
+      {/* Stale banner — after several consecutive background-fetch failures */}
+      {showStaleBanner ? (
+        <StaleBanner onRefresh={handleRefresh} onDismiss={dismissStaleBanner} />
+      ) : null}
 
       {isLoading ? (
         <View style={styles.centered}>

@@ -13,8 +13,10 @@ import {
 } from 'react-native';
 import { keepPreviousData } from '@tanstack/react-query';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { StaleBanner } from '@/components/StaleBanner';
 import { useColors } from '@/hooks/useColors';
 import { useRefreshInterval } from '@/hooks/useRefreshInterval';
+import { useStaleBanner } from '@/hooks/useStaleBanner';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -175,9 +177,11 @@ export default function SelectionsScreen() {
     refetch,
     isRefetching,
     dataUpdatedAt,
+    failureCount,
   } = useGetNominations({ query: { queryKey: getGetNominationsQueryKey(), refetchInterval } });
   const { data: summary } = useGetNominationsSummary({ query: { queryKey: getGetNominationsSummaryQueryKey(), refetchInterval } });
   const updatedLabel = useSecondsAgo(dataUpdatedAt);
+  const { showBanner: showStaleBanner, dismiss: dismissStaleBanner } = useStaleBanner(failureCount, isError);
 
   const filtered = nominations
     ? filter === 'All' ? nominations : nominations.filter(n => n.status === filter)
@@ -256,6 +260,10 @@ export default function SelectionsScreen() {
 
       {/* Offline banner — only when errored but cached data is still on-screen */}
       {isError && nominations ? <OfflineBanner /> : null}
+      {/* Stale banner — after several consecutive background-fetch failures */}
+      {showStaleBanner ? (
+        <StaleBanner onRefresh={refetch} onDismiss={dismissStaleBanner} />
+      ) : null}
 
       {/* List */}
       {isLoading ? (

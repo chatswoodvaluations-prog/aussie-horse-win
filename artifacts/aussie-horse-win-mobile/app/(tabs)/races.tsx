@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { keepPreviousData } from '@tanstack/react-query';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { StaleBanner } from '@/components/StaleBanner';
 import { useColors } from '@/hooks/useColors';
 import { useRefreshInterval } from '@/hooks/useRefreshInterval';
+import { useStaleBanner } from '@/hooks/useStaleBanner';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -132,8 +134,10 @@ export default function RacesScreen() {
     refetch,
     isRefetching,
     dataUpdatedAt,
+    failureCount,
   } = useGetRaces({ query: { queryKey: getGetRacesQueryKey(), refetchInterval } });
   const updatedLabel = useSecondsAgo(dataUpdatedAt);
+  const { showBanner: showStaleBanner, dismiss: dismissStaleBanner } = useStaleBanner(failureCount, isError);
 
   const isWeb = Platform.OS === 'web';
   const topPad = isWeb ? 67 : insets.top;
@@ -176,6 +180,10 @@ export default function RacesScreen() {
 
       {/* Offline banner — only when errored but cached data is still on-screen */}
       {isError && races ? <OfflineBanner /> : null}
+      {/* Stale banner — after several consecutive background-fetch failures */}
+      {showStaleBanner ? (
+        <StaleBanner onRefresh={refetch} onDismiss={dismissStaleBanner} />
+      ) : null}
 
       {isLoading ? (
         <View style={styles.centered}>
