@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildChartData } from './performance';
+import { buildChartData, computeKpis } from './performance';
 import type { BetResult } from '@workspace/api-client-react';
 import { BetResultOutcome } from '@workspace/api-client-react';
 
@@ -98,5 +98,111 @@ describe('buildChartData', () => {
     const data = buildChartData(bets);
 
     expect(data[data.length - 1].cumPnl).toBe(-45);
+  });
+});
+
+describe('computeKpis', () => {
+  it('returns null for an empty history', () => {
+    expect(computeKpis([])).toBeNull();
+  });
+
+  it('netProfitLoss equals the sum of all bet.netResult values', () => {
+    const bets = [
+      makeBet({ netResult: -15, raceDate: '2026-01-01T00:00:00Z', totalOutlay: 15, actualWinReturn: null, actualPlaceReturn: null }),
+      makeBet({ netResult: 40, raceDate: '2026-01-02T00:00:00Z', outcome: BetResultOutcome.Won, totalOutlay: 15, winStake: 10, placeStake: 5, actualWinReturn: 50, actualPlaceReturn: 5 }),
+      makeBet({ netResult: -15, raceDate: '2026-01-03T00:00:00Z', totalOutlay: 15, actualWinReturn: null, actualPlaceReturn: null }),
+      makeBet({ netResult: 25, raceDate: '2026-01-04T00:00:00Z', outcome: BetResultOutcome.Placed, totalOutlay: 15, winStake: 10, placeStake: 5, actualWinReturn: null, actualPlaceReturn: 40 }),
+    ];
+
+    const kpis = computeKpis(bets);
+
+    const expectedNetPnl = bets.reduce((acc, b) => acc + b.netResult, 0);
+    expect(kpis).not.toBeNull();
+    expect(kpis!.netProfitLoss).toBeCloseTo(expectedNetPnl, 10);
+  });
+
+  it('netProfitLoss matches sum of netResult when all bets are losses', () => {
+    const bets = [
+      makeBet({ netResult: -15, raceDate: '2026-01-01T00:00:00Z', totalOutlay: 15, actualWinReturn: null, actualPlaceReturn: null }),
+      makeBet({ netResult: -15, raceDate: '2026-01-02T00:00:00Z', totalOutlay: 15, actualWinReturn: null, actualPlaceReturn: null }),
+      makeBet({ netResult: -15, raceDate: '2026-01-03T00:00:00Z', totalOutlay: 15, actualWinReturn: null, actualPlaceReturn: null }),
+    ];
+
+    const kpis = computeKpis(bets);
+
+    const expectedNetPnl = bets.reduce((acc, b) => acc + b.netResult, 0);
+    expect(kpis).not.toBeNull();
+    expect(kpis!.netProfitLoss).toBeCloseTo(expectedNetPnl, 10);
+  });
+
+  it('netProfitLoss matches sum of netResult for a single winning bet', () => {
+    const bet = makeBet({
+      netResult: 35,
+      raceDate: '2026-03-15T10:00:00Z',
+      outcome: BetResultOutcome.Won,
+      totalOutlay: 15,
+      winStake: 10,
+      placeStake: 5,
+      actualWinReturn: 45,
+      actualPlaceReturn: 5,
+    });
+
+    const kpis = computeKpis([bet]);
+
+    expect(kpis).not.toBeNull();
+    expect(kpis!.netProfitLoss).toBeCloseTo(35, 10);
+    expect(kpis!.totalBets).toBe(1);
+  });
+
+  it('badge value (netProfitLoss) equals sum of trade-log rows (netResult) — mixed outcomes', () => {
+    // This is the core invariant: badge === sum of trade log
+    const bets = [
+      makeBet({ netResult: -15, raceDate: '2026-01-01T00:00:00Z', totalOutlay: 15, actualWinReturn: null, actualPlaceReturn: null }),
+      makeBet({ netResult: 85, raceDate: '2026-01-02T00:00:00Z', outcome: BetResultOutcome.Won, totalOutlay: 15, winStake: 10, placeStake: 5, actualWinReturn: 95, actualPlaceReturn: 5 }),
+      makeBet({ netResult: 10, raceDate: '2026-01-03T00:00:00Z', outcome: BetResultOutcome.Placed, totalOutlay: 15, winStake: 10, placeStake: 5, actualWinReturn: null, actualPlaceReturn: 25 }),
+      makeBet({ netResult: -15, raceDate: '2026-01-04T00:00:00Z', totalOutlay: 15, actualWinReturn: null, actualPlaceReturn: null }),
+    ];
+
+    const kpis = computeKpis(bets);
+    const tradeLogSum = bets.reduce((acc, b) => acc + b.netResult, 0);
+
+    expect(kpis).not.toBeNull();
+    expect(kpis!.netProfitLoss).toBeCloseTo(tradeLogSum, 10);
+  });
+
+  it('badge follows netResult even when it differs from actualReturns − totalOutlay', () => {
+    // Regression: if the server-persisted netResult diverges from
+    // (actualWinReturn + actualPlaceReturn − totalOutlay) due to rounding,
+    // adjustments, or a future schema change, the badge must follow netResult
+    // (matching the trade-log row) — not recompute from the raw return fields.
+    const bets = [
+      // netResult deliberately set to a value that does NOT equal returns − outlay
+      // (returns − outlay = 50 + 5 − 15 = 40, but server settled it as 41.50)
+      makeBet({
+        netResult: 41.50,
+        raceDate: '2026-06-01T00:00:00Z',
+        outcome: BetResultOutcome.Won,
+        totalOutlay: 15,
+        winStake: 10,
+        placeStake: 5,
+        actualWinReturn: 50,
+        actualPlaceReturn: 5,
+      }),
+      makeBet({
+        netResult: -15,
+        raceDate: '2026-06-02T00:00:00Z',
+        totalOutlay: 15,
+        actualWinReturn: null,
+        actualPlaceReturn: null,
+      }),
+    ];
+
+    const kpis = computeKpis(bets);
+    const tradeLogSum = bets.reduce((acc, b) => acc + b.netResult, 0); // 41.50 + (−15) = 26.50
+    const returnsMinusOutlay = (50 + 5 + 0 + 0) - (15 + 15);          // 25.00 — badge must NOT use this
+
+    expect(kpis).not.toBeNull();
+    expect(kpis!.netProfitLoss).toBeCloseTo(tradeLogSum, 10);       // 26.50 ✓
+    expect(kpis!.netProfitLoss).not.toBeCloseTo(returnsMinusOutlay, 10); // must not be 25.00
   });
 });

@@ -24,11 +24,12 @@ const DATE_RANGE_OPTIONS: { label: string; value: DateRange }[] = [
 
 // ─── KPI computation from raw history ────────────────────────────────────────
 
-function computeKpis(bets: BetResult[]) {
+export function computeKpis(bets: BetResult[]) {
   if (!bets.length) return null;
 
   let totalOutlay = 0;
   let totalReturns = 0;
+  let netProfitLossFromResult = 0;
   let wins = 0;
   let places = 0;
   // Derive implied odds from actual returns ÷ stake (matching server logic).
@@ -45,6 +46,7 @@ function computeKpis(bets: BetResult[]) {
   for (const bet of bets) {
     totalOutlay += bet.totalOutlay;
     totalReturns += (bet.actualWinReturn ?? 0) + (bet.actualPlaceReturn ?? 0);
+    netProfitLossFromResult += bet.netResult;
 
     const isWin = bet.outcome === BetResultOutcome.Won;
     const isPlace = bet.outcome === BetResultOutcome.Placed;
@@ -75,7 +77,9 @@ function computeKpis(bets: BetResult[]) {
     }
   }
 
-  const netProfitLoss = totalReturns - totalOutlay;
+  // Use the persisted netResult field — the same source as each Trade Log row —
+  // so the badge can never disagree with the log totals.
+  const netProfitLoss = netProfitLossFromResult;
   const roi = totalOutlay > 0 ? (netProfitLoss / totalOutlay) * 100 : 0;
   const winStrikeRate = (wins / bets.length) * 100;
   const placeStrikeRate = ((wins + places) / bets.length) * 100;
