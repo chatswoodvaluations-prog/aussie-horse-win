@@ -602,7 +602,8 @@ router.post("/sync", async (req, res): Promise<void> => {
     racesAdded,
     runnersAdded,
     nominationsGenerated: engineResult.nominationsGenerated,
-    message: `Sync complete (source: ${dataSource}). Added ${racesAdded} races and ${runnersAdded} runners. Generated ${engineResult.nominationsGenerated} new nominations.`,
+    nominationsRepriced: engineResult.nominationsRepriced,
+    message: `Sync complete (source: ${dataSource}). Added ${racesAdded} races and ${runnersAdded} runners. Generated ${engineResult.nominationsGenerated} new nominations. Repriced ${engineResult.nominationsRepriced} pending nominations.`,
   };
 
   logger.info(result, "Sync completed");

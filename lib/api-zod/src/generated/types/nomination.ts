@@ -26,14 +26,14 @@ export interface Nomination {
   winOdds: number;
   placeOdds: number;
   /**
-   * Ladbrokes fixed-odds win price — null when Ladbrokes does not quote this runner
-   * @nullable
-   */
+     * Ladbrokes fixed-odds win price — null when Ladbrokes does not quote this runner
+     * @nullable
+     */
   ladbrokesWinOdds?: number | null;
   /**
-   * Ladbrokes fixed-odds place price — null when Ladbrokes does not quote this runner
-   * @nullable
-   */
+     * Ladbrokes fixed-odds place price — null when Ladbrokes does not quote this runner
+     * @nullable
+     */
   ladbrokesPlaceOdds?: number | null;
   winStake: number;
   placeStake: number;

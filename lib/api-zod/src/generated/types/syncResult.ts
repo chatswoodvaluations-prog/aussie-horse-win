@@ -11,5 +11,7 @@ export interface SyncResult {
   racesAdded: number;
   runnersAdded: number;
   nominationsGenerated: number;
+  /** Number of Pending nominations updated with fresh odds this sync */
+  nominationsRepriced: number;
   message: string;
 }

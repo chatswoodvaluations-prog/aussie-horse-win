@@ -698,6 +698,10 @@ components:
           type: integer
         nominationsGenerated:
           type: integer
+        nominationsRepriced:
+          type: integer
+          description: Number of Pending nominations updated with fresh odds this sync
+          default: 0
         message:
           type: string
       required:
@@ -705,4 +709,5 @@ components:
         - racesAdded
         - runnersAdded
         - nominationsGenerated
+        - nominationsRepriced
         - message

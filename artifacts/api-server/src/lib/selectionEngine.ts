@@ -123,6 +123,7 @@ export async function runSelectionEngine(): Promise<{
   racesAdded: number;
   runnersAdded: number;
   nominationsGenerated: number;
+  nominationsRepriced: number;
 }> {
   const settings = await getSettings();
   const enabledTrackIds = settings.enabledTrackIds;
@@ -140,6 +141,7 @@ export async function runSelectionEngine(): Promise<{
   const races = allRaces.filter((r) => trackIds.includes(r.trackId));
 
   let nominationsGenerated = 0;
+  let nominationsRepriced = 0;
 
   for (const race of races) {
     const runners = await db.select().from(runnersTable).where(eq(runnersTable.raceId, race.id));
@@ -156,55 +158,81 @@ export async function runSelectionEngine(): Promise<{
         })
         .where(eq(runnersTable.id, runner.id));
 
-      if (passed) {
-        // Check if nomination already exists
-        const existing = await db
-          .select()
-          .from(nominationsTable)
-          .where(eq(nominationsTable.runnerId, runner.id));
+      // Always fetch existing nominations for this runner so we can reprice
+      // Pending ones regardless of whether the runner currently passes filters.
+      // Repricing must happen even when odds drift outside the selection window —
+      // the displayed figures must always reflect the current market price.
+      const existing = await db
+        .select()
+        .from(nominationsTable)
+        .where(eq(nominationsTable.runnerId, runner.id));
 
-        if (existing.length === 0) {
-          const projectedWinReturn = settings.winStake * runner.winOdds + settings.placeStake * runner.placeOdds;
-          const projectedPlaceReturn = settings.placeStake * runner.placeOdds;
+      const pendingNoms = existing.filter((n) => n.status === "Pending");
 
-          await db.insert(nominationsTable).values({
-            raceId: race.id,
-            runnerId: runner.id,
-            trackName: race.trackName,
-            state: race.state,
-            raceNumber: race.raceNumber,
-            raceName: race.raceName,
-            raceDate: race.raceDate,
-            raceTime: race.raceTime,
-            horseName: runner.horseName,
-            barrierNumber: runner.barrierNumber,
-            speedMapPosition: runner.speedMapPosition,
-            winOdds: runner.winOdds,
-            placeOdds: runner.placeOdds,
-            ladbrokesWinOdds: runner.ladbrokesWinOdds ?? null,
-            ladbrokesPlaceOdds: runner.ladbrokesPlaceOdds ?? null,
-            winStake: settings.winStake,
-            placeStake: settings.placeStake,
-            totalOutlay: settings.winStake + settings.placeStake,
-            projectedWinReturn,
-            projectedPlaceReturn,
-            jockey: runner.jockey,
-            trainer: runner.trainer,
-            status: "Pending",
-          });
+      if (pendingNoms.length > 0) {
+        // Reprice every Pending nomination using the fresh runner odds.
+        // Each nomination's stored winStake/placeStake is preserved — only
+        // the odds snapshot and derived projections are updated.
+        // Won/Placed/Unplaced records are immutable.
+        for (const nom of pendingNoms) {
+          const projectedWinReturn = nom.winStake * runner.winOdds + nom.placeStake * runner.placeOdds;
+          const projectedPlaceReturn = nom.placeStake * runner.placeOdds;
 
-          nominationsGenerated++;
+          await db
+            .update(nominationsTable)
+            .set({
+              winOdds: runner.winOdds,
+              placeOdds: runner.placeOdds,
+              projectedWinReturn,
+              projectedPlaceReturn,
+            })
+            .where(eq(nominationsTable.id, nom.id));
+
+          nominationsRepriced++;
         }
+      } else if (passed && existing.length === 0) {
+        // No nomination yet and runner passes all filters — create one.
+        const projectedWinReturn = settings.winStake * runner.winOdds + settings.placeStake * runner.placeOdds;
+        const projectedPlaceReturn = settings.placeStake * runner.placeOdds;
+
+        await db.insert(nominationsTable).values({
+          raceId: race.id,
+          runnerId: runner.id,
+          trackName: race.trackName,
+          state: race.state,
+          raceNumber: race.raceNumber,
+          raceName: race.raceName,
+          raceDate: race.raceDate,
+          raceTime: race.raceTime,
+          horseName: runner.horseName,
+          barrierNumber: runner.barrierNumber,
+          speedMapPosition: runner.speedMapPosition,
+          winOdds: runner.winOdds,
+          placeOdds: runner.placeOdds,
+          ladbrokesWinOdds: runner.ladbrokesWinOdds ?? null,
+          ladbrokesPlaceOdds: runner.ladbrokesPlaceOdds ?? null,
+          winStake: settings.winStake,
+          placeStake: settings.placeStake,
+          totalOutlay: settings.winStake + settings.placeStake,
+          projectedWinReturn,
+          projectedPlaceReturn,
+          jockey: runner.jockey,
+          trainer: runner.trainer,
+          status: "Pending",
+        });
+
+        nominationsGenerated++;
       }
     }
   }
 
-  logger.info({ nominationsGenerated }, "Selection engine run complete");
+  logger.info({ nominationsGenerated, nominationsRepriced }, "Selection engine run complete");
 
   return {
     racesFound: races.length,
     racesAdded: 0,
     runnersAdded: 0,
     nominationsGenerated,
+    nominationsRepriced,
   };
 }

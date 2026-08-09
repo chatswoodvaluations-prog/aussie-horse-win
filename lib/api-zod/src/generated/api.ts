@@ -36,8 +36,8 @@ export const GetNominationsResponseItem = zod.object({
   "speedMapPosition": zod.string(),
   "winOdds": zod.number(),
   "placeOdds": zod.number(),
-  "ladbrokesWinOdds": zod.number().nullable().nullish().describe('Ladbrokes fixed-odds win price — null when Ladbrokes does not quote this runner'),
-  "ladbrokesPlaceOdds": zod.number().nullable().nullish().describe('Ladbrokes fixed-odds place price — null when Ladbrokes does not quote this runner'),
+  "ladbrokesWinOdds": zod.number().nullish().describe('Ladbrokes fixed-odds win price — null when Ladbrokes does not quote this runner'),
+  "ladbrokesPlaceOdds": zod.number().nullish().describe('Ladbrokes fixed-odds place price — null when Ladbrokes does not quote this runner'),
   "winStake": zod.number(),
   "placeStake": zod.number(),
   "totalOutlay": zod.number(),
@@ -305,11 +305,14 @@ export const GetTrackBreakdownResponse = zod.array(GetTrackBreakdownResponseItem
  * Fetches/generates upcoming race card data and runs the selection engine
  * @summary Trigger race data sync
  */
+export const triggerSyncResponseNominationsRepricedDefault = 0;
+
 export const TriggerSyncResponse = zod.object({
   "racesFound": zod.int(),
   "racesAdded": zod.int(),
   "runnersAdded": zod.int(),
   "nominationsGenerated": zod.int(),
+  "nominationsRepriced": zod.int().default(triggerSyncResponseNominationsRepricedDefault).describe('Number of Pending nominations updated with fresh odds this sync'),
   "message": zod.string()
 })
 
