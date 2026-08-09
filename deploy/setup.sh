@@ -58,7 +58,7 @@ sudo apt-get install -y -qq nodejs
 
 # ── 4. pnpm ───────────────────────────────────────────────────────────────────
 step "Installing pnpm"
-sudo npm install -g pnpm@latest --quiet
+sudo npm install -g pnpm@10.26.1 --quiet
 
 # ── 5. PM2 (keeps the app running 24/7) ──────────────────────────────────────
 step "Installing PM2 (process manager)"
@@ -101,8 +101,7 @@ chmod 600 "$APP_DIR/.env.production"
 # ── 9. Install dependencies & build ──────────────────────────────────────────
 step "Installing packages (this takes 2-3 minutes)"
 cd "$APP_DIR"
-rm -f pnpm-lock.yaml
-pnpm install
+pnpm install --frozen-lockfile
 
 step "Building the app"
 # Build the API server
