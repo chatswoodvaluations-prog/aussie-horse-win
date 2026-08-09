@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,10 +10,11 @@ import {
   View,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { useRefreshInterval } from '@/hooks/useRefreshInterval';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useGetRaces } from '@workspace/api-client-react';
+import { useGetRaces, getGetRacesQueryKey } from '@workspace/api-client-react';
 import type { Race } from '@workspace/api-client-react';
 
 function QualifiedBadge({ count }: { count: number }) {
@@ -103,11 +104,34 @@ function MetaItem({
   );
 }
 
+function useSecondsAgo(timestamp: number): string {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick(n => n + 1), 10_000);
+    return () => clearInterval(id);
+  }, []);
+  if (timestamp === 0) return '';
+  const secs = Math.floor((Date.now() - timestamp) / 1000);
+  if (secs < 10) return 'just now';
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  return `${mins}m ago`;
+}
+
 export default function RacesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const refetchInterval = useRefreshInterval();
 
-  const { data: races, isLoading, isError, refetch, isRefetching } = useGetRaces();
+  const {
+    data: races,
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+    dataUpdatedAt,
+  } = useGetRaces({ query: { queryKey: getGetRacesQueryKey(), refetchInterval } });
+  const updatedLabel = useSecondsAgo(dataUpdatedAt);
 
   const isWeb = Platform.OS === 'web';
   const topPad = isWeb ? 67 : insets.top;
@@ -133,7 +157,14 @@ export default function RacesScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 16 }]}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Race Explorer</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Race Explorer</Text>
+          {updatedLabel ? (
+            <Text style={[styles.updatedLabel, { color: colors.mutedForeground }]}>
+              Updated {updatedLabel}
+            </Text>
+          ) : null}
+        </View>
         {races && (
           <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
             {races.length} upcoming races
@@ -200,10 +231,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 10,
+  },
   headerTitle: {
     fontFamily: 'Inter_700Bold',
     fontSize: 28,
     letterSpacing: -0.5,
+  },
+  updatedLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
   },
   headerSub: {
     fontFamily: 'Inter_400Regular',

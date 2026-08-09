@@ -28,7 +28,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
-      staleTime: 30_000,
+      // Keep data fresh enough for 60 s polling to be meaningful.
+      staleTime: 20_000,
     },
   },
 });
