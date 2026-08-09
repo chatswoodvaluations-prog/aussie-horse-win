@@ -101,7 +101,7 @@ chmod 600 "$APP_DIR/.env.production"
 # ── 9. Install dependencies & build ──────────────────────────────────────────
 step "Installing packages (this takes 2-3 minutes)"
 cd "$APP_DIR"
-pnpm install --frozen-lockfile
+pnpm install --no-frozen-lockfile
 
 step "Building the app"
 # Build the API server
