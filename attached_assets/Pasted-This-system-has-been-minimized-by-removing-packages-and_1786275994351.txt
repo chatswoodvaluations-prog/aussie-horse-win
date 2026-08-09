@@ -1,0 +1,70 @@
+This system has been minimized by removing packages and content that are
+not required on a system that users do not log into.
+
+To restore this content, you can run the 'unminimize' command.
+
+Expanded Security Maintenance for Applications is not enabled.
+
+10 updates can be applied immediately.
+10 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+New release '24.04.4 LTS' available.
+Run 'do-release-upgrade' to upgrade to it.
+
+*** System restart required ***
+Last login: Sun Aug  9 10:36:54 2026 from 152.67.105.12
+ubuntu@aussie-horse-win:~$ sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT && sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT && sudo netfilter-persistent save
+run-parts: executing /usr/share/netfilter-persistent/plugins.d/15-ip4tables save
+run-parts: executing /usr/share/netfilter-persistent/plugins.d/25-ip6tables save
+ubuntu@aussie-horse-win:~$ ls ~/aussie-horse-win/artifacts/aussie-horse-win/dist/public/ | head -5
+assets
+favicon.svg
+index.html
+robots.txt
+ubuntu@aussie-horse-win:~$ sudo tail -20 /var/log/nginx/error.log
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [error] 30685#30685: *2 rewrite or internal redirection cycle while internally redirecting to "/index.html", client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+ubuntu@aussie-horse-win:~$ sudo tail -20 /var/log/nginx/error.log
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [crit] 30685#30685: *2 stat() "/home/ubuntu/aussie-horse-win/artifacts/aussie-horse-win/dist/public/index.html" failed (13: Permission denied), client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+2026/08/09 11:43:45 [error] 30685#30685: *2 rewrite or internal redirection cycle while internally redirecting to "/index.html", client: 60.227.156.156, server: _, request: "GET /favicon.ico HTTP/1.1", host: "149.118.66.37", referrer: "http://149.118.66.37/"
+ubuntu@aussie-horse-win:~$ 
