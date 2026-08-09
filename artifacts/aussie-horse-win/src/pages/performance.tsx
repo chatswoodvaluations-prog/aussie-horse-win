@@ -1,17 +1,158 @@
-import { useGetPerformance, useGetTrackBreakdown, useGetBetHistory, BetResultOutcome } from '@workspace/api-client-react';
+import { useGetBetHistory, useGetTrackBreakdown, BetResultOutcome, BetResult, TrackPerformance } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Activity, TrendingUp, TrendingDown, Crosshair, DollarSign, ListOrdered, CalendarDays, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Activity, TrendingUp, TrendingDown, Crosshair, DollarSign, ListOrdered, CalendarDays, Filter, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
+import { useMemo, useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type DateRange = 7 | 30 | 90 | 'all';
+
+const DATE_RANGE_OPTIONS: { label: string; value: DateRange }[] = [
+  { label: '7d', value: 7 },
+  { label: '30d', value: 30 },
+  { label: '90d', value: 90 },
+  { label: 'All', value: 'all' },
+];
+
+// ─── KPI computation from raw history ────────────────────────────────────────
+
+function computeKpis(bets: BetResult[]) {
+  if (!bets.length) return null;
+
+  let totalOutlay = 0;
+  let totalReturns = 0;
+  let wins = 0;
+  let places = 0;
+  // Derive implied odds from actual returns ÷ stake (matching server logic).
+  // actualWinReturn / winStake gives the decimal win price paid.
+  // actualPlaceReturn / placeStake gives the decimal place price paid.
+  const impliedWinOdds: number[] = [];
+  const impliedPlaceOdds: number[] = [];
+
+  let currentStreak = 0;
+  let longestWinStreak = 0;
+  let currentLossStreak = 0;
+  let longestLosingStreak = 0;
+
+  for (const bet of bets) {
+    totalOutlay += bet.totalOutlay;
+    totalReturns += (bet.actualWinReturn ?? 0) + (bet.actualPlaceReturn ?? 0);
+
+    const isWin = bet.outcome === BetResultOutcome.Won;
+    const isPlace = bet.outcome === BetResultOutcome.Placed;
+
+    if (isWin) {
+      wins++;
+      if (bet.winStake > 0 && (bet.actualWinReturn ?? 0) > 0) {
+        impliedWinOdds.push((bet.actualWinReturn ?? 0) / bet.winStake);
+      }
+      if (bet.placeStake > 0 && (bet.actualPlaceReturn ?? 0) > 0) {
+        impliedPlaceOdds.push((bet.actualPlaceReturn ?? 0) / bet.placeStake);
+      }
+      currentStreak++;
+      currentLossStreak = 0;
+      longestWinStreak = Math.max(longestWinStreak, currentStreak);
+    } else if (isPlace) {
+      places++;
+      if (bet.placeStake > 0 && (bet.actualPlaceReturn ?? 0) > 0) {
+        impliedPlaceOdds.push((bet.actualPlaceReturn ?? 0) / bet.placeStake);
+      }
+      currentStreak = 0;
+      currentLossStreak++;
+      longestLosingStreak = Math.max(longestLosingStreak, currentLossStreak);
+    } else {
+      currentStreak = 0;
+      currentLossStreak++;
+      longestLosingStreak = Math.max(longestLosingStreak, currentLossStreak);
+    }
+  }
+
+  const netProfitLoss = totalReturns - totalOutlay;
+  const roi = totalOutlay > 0 ? (netProfitLoss / totalOutlay) * 100 : 0;
+  const winStrikeRate = (wins / bets.length) * 100;
+  const placeStrikeRate = ((wins + places) / bets.length) * 100;
+  const avgOddsWin = impliedWinOdds.length
+    ? impliedWinOdds.reduce((a, b) => a + b, 0) / impliedWinOdds.length
+    : 0;
+  const avgOddsPlace = impliedPlaceOdds.length
+    ? impliedPlaceOdds.reduce((a, b) => a + b, 0) / impliedPlaceOdds.length
+    : 0;
+
+  return {
+    netProfitLoss,
+    roi,
+    totalBets: bets.length,
+    winStrikeRate,
+    placeStrikeRate,
+    totalOutlay,
+    totalReturns,
+    avgOddsWin,
+    avgOddsPlace,
+    longestWinStreak,
+    longestLosingStreak,
+  };
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function PerformanceDashboard() {
-  const { data: perf, isLoading: isPerfLoading } = useGetPerformance();
   const { data: trackBreakdown, isLoading: isTracksLoading } = useGetTrackBreakdown();
   const { data: history, isLoading: isHistoryLoading } = useGetBetHistory();
+
+  const [dateRange, setDateRange] = useState<DateRange>('all');
+  const [selectedTracks, setSelectedTracks] = useState<string[]>([]);
+  const [trackPopoverOpen, setTrackPopoverOpen] = useState(false);
+
+  // All unique track names from history
+  const allTracks = useMemo(() => {
+    if (!history?.length) return [];
+    const names = Array.from(new Set(history.map((b) => b.trackName).filter(Boolean))) as string[];
+    return names.sort();
+  }, [history]);
+
+  // Filtered history — typed as BetResult[]
+  const filteredHistory = useMemo((): BetResult[] => {
+    if (!history?.length) return [];
+
+    let result: BetResult[] = history;
+
+    // Date filter
+    if (dateRange !== 'all') {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - dateRange);
+      result = result.filter((b) => new Date(b.raceDate) >= cutoff);
+    }
+
+    // Track filter
+    if (selectedTracks.length > 0) {
+      result = result.filter((b) => selectedTracks.includes(b.trackName));
+    }
+
+    return result;
+  }, [history, dateRange, selectedTracks]);
+
+  const perf = useMemo(() => computeKpis(filteredHistory), [filteredHistory]);
+
+  const isFiltered = dateRange !== 'all' || selectedTracks.length > 0;
+
+  function clearFilters() {
+    setDateRange('all');
+    setSelectedTracks([]);
+  }
+
+  function toggleTrack(track: string) {
+    setSelectedTracks((prev) =>
+      prev.includes(track) ? prev.filter((t) => t !== track) : [...prev, track]
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
@@ -33,8 +174,106 @@ export default function PerformanceDashboard() {
         )}
       </header>
 
-      {/* KPI Grid */}
-      {isPerfLoading ? (
+      {/* ── Filters ── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs uppercase font-mono text-muted-foreground flex items-center gap-1.5">
+          <Filter className="size-3.5" />
+          Filter
+        </span>
+
+        {/* Date range */}
+        <div className="flex items-center gap-1 bg-secondary/40 rounded-lg p-1">
+          {DATE_RANGE_OPTIONS.map(({ label, value }) => (
+            <button
+              key={value}
+              onClick={() => setDateRange(value)}
+              className={cn(
+                "px-3 py-1 rounded text-xs font-mono transition-colors",
+                dateRange === value
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Track multi-select */}
+        <Popover open={trackPopoverOpen} onOpenChange={setTrackPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-8 gap-1.5 text-xs font-mono",
+                selectedTracks.length > 0 && "border-primary text-primary"
+              )}
+            >
+              <Crosshair className="size-3" />
+              {selectedTracks.length === 0
+                ? 'All tracks'
+                : selectedTracks.length === 1
+                ? selectedTracks[0]
+                : `${selectedTracks.length} tracks`}
+              <ChevronDown className="size-3 ml-0.5 opacity-60" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-2" align="start">
+            <div className="text-xs font-mono text-muted-foreground uppercase mb-2 px-2 pt-1">Select tracks</div>
+            {allTracks.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-2 py-4">No track data available.</p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-1">
+                {allTracks.map((track) => (
+                  <label
+                    key={track}
+                    className="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-secondary/60 cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={selectedTracks.includes(track)}
+                      onCheckedChange={() => toggleTrack(track)}
+                      className="size-3.5"
+                    />
+                    <span className="text-xs truncate">{track}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {selectedTracks.length > 0 && (
+              <div className="border-t border-border mt-2 pt-2 px-1">
+                <button
+                  onClick={() => setSelectedTracks([])}
+                  className="text-xs text-muted-foreground hover:text-destructive transition-colors w-full text-left px-1"
+                >
+                  Clear track selection
+                </button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+
+        {/* Clear all badge */}
+        {isFiltered && (
+          <button
+            onClick={clearFilters}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors font-mono"
+          >
+            <X className="size-3" />
+            Clear filters
+          </button>
+        )}
+
+        {/* Showing count */}
+        {!isHistoryLoading && history?.length !== undefined && (
+          <span className="text-xs text-muted-foreground font-mono ml-auto">
+            {filteredHistory.length} / {history.length} bets
+          </span>
+        )}
+      </div>
+
+      {/* KPI Grid — computed from filtered history */}
+      {isHistoryLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {[1,2,3,4,5,6,7,8,9,10].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
         </div>
@@ -51,10 +290,14 @@ export default function PerformanceDashboard() {
           <KpiCard title="Best Streak" value={`${perf.longestWinStreak} Wins`} valueColor="text-primary" />
           <KpiCard title="Worst Streak" value={`${perf.longestLosingStreak} Losses`} valueColor="text-destructive" />
         </div>
-      ) : null}
+      ) : (
+        <div className="h-24 flex items-center justify-center text-muted-foreground text-sm border border-dashed border-border rounded-xl">
+          No bets match the current filters.
+        </div>
+      )}
 
       {/* Cumulative P&L Chart */}
-      <PnlChart history={history} isLoading={isHistoryLoading} />
+      <PnlChart history={filteredHistory} isLoading={isHistoryLoading} isFiltered={isFiltered} />
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Track Breakdown */}
@@ -73,7 +316,7 @@ export default function PerformanceDashboard() {
               </div>
             ) : trackBreakdown?.length ? (
               <div className="divide-y divide-border">
-                {trackBreakdown.map((tb, i) => (
+                {trackBreakdown.map((tb: TrackPerformance, i: number) => (
                   <div key={i} className="p-4 flex items-center justify-between hover:bg-secondary/20 transition-colors">
                     <div>
                       <div className="font-bold flex items-center gap-2">
@@ -109,7 +352,9 @@ export default function PerformanceDashboard() {
                 <ListOrdered className="size-5 text-primary" />
                 Trade Log
               </CardTitle>
-              <CardDescription className="font-mono text-xs">Historical settled bets</CardDescription>
+              <CardDescription className="font-mono text-xs">
+                Historical settled bets{isFiltered ? ` (filtered: ${filteredHistory.length})` : ''}
+              </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-auto max-h-[500px]">
@@ -117,7 +362,7 @@ export default function PerformanceDashboard() {
                <div className="p-6 space-y-4">
                {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-12 w-full" />)}
              </div>
-            ) : history?.length ? (
+            ) : filteredHistory.length ? (
               <div className="w-full">
                 <table className="w-full text-sm">
                   <thead className="bg-secondary/50 font-mono text-xs uppercase text-muted-foreground sticky top-0 z-10 shadow-[0_1px_0_var(--border)]">
@@ -131,7 +376,7 @@ export default function PerformanceDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {history.map((bet) => {
+                    {filteredHistory.map((bet: BetResult) => {
                       const isWin = bet.outcome === BetResultOutcome.Won;
                       const isPlace = bet.outcome === BetResultOutcome.Placed;
                       const isLoss = bet.outcome === BetResultOutcome.Unplaced;
@@ -177,8 +422,17 @@ export default function PerformanceDashboard() {
             ) : (
               <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
                 <CalendarDays className="size-10 mb-3 opacity-20" />
-                <p>No historical trades found.</p>
-                <p className="text-xs mt-1">Pending nominations must be settled first.</p>
+                {isFiltered ? (
+                  <>
+                    <p>No bets match the current filters.</p>
+                    <button onClick={clearFilters} className="text-xs mt-2 text-primary hover:underline">Clear filters</button>
+                  </>
+                ) : (
+                  <>
+                    <p>No historical trades found.</p>
+                    <p className="text-xs mt-1">Pending nominations must be settled first.</p>
+                  </>
+                )}
               </div>
             )}
           </CardContent>
@@ -188,11 +442,21 @@ export default function PerformanceDashboard() {
   );
 }
 
+// ─── P&L Chart ───────────────────────────────────────────────────────────────
+
 const pnlChartConfig = {
   cumPnl: { label: 'Cumulative P&L', color: 'hsl(var(--primary))' },
 };
 
-function PnlChart({ history, isLoading }: { history: any[] | undefined; isLoading: boolean }) {
+function PnlChart({
+  history,
+  isLoading,
+  isFiltered,
+}: {
+  history: BetResult[];
+  isLoading: boolean;
+  isFiltered: boolean;
+}) {
   const chartData = useMemo(() => {
     if (!history?.length) return [];
     const sorted = [...history].sort(
@@ -212,18 +476,28 @@ function PnlChart({ history, isLoading }: { history: any[] | undefined; isLoadin
   return (
     <Card className="border-border bg-card">
       <CardHeader className="pb-4 border-b border-border bg-secondary/20">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <TrendingUp className="size-5 text-primary" />
-          Cumulative P&amp;L
-        </CardTitle>
-        <CardDescription className="font-mono text-xs">Running profit/loss across all settled bets</CardDescription>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="size-5 text-primary" />
+              Cumulative P&amp;L
+            </CardTitle>
+            <CardDescription className="font-mono text-xs">
+              {isFiltered
+                ? `Running profit/loss for filtered selection (${history.length} bets)`
+                : 'Running profit/loss across all settled bets'}
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="pt-6 pb-4 px-2">
         {isLoading ? (
           <Skeleton className="h-56 w-full rounded-lg" />
         ) : chartData.length === 0 ? (
           <div className="h-56 flex items-center justify-center text-muted-foreground text-sm">
-            No settled bets yet — chart will appear once results are recorded.
+            {isFiltered
+              ? 'No bets match the current filters — adjust the date range or track selection.'
+              : 'No settled bets yet — chart will appear once results are recorded.'}
           </div>
         ) : (
           <ChartContainer config={pnlChartConfig} className="h-56 w-full">
@@ -271,7 +545,14 @@ function PnlChart({ history, isLoading }: { history: any[] | undefined; isLoadin
   );
 }
 
-function KpiCard({ title, value, trend, valueColor = "text-foreground" }: any) {
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
+
+function KpiCard({ title, value, trend, valueColor = "text-foreground" }: {
+  title: string;
+  value: string;
+  trend?: 'up' | 'down';
+  valueColor?: string;
+}) {
   return (
     <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between hover:border-primary/50 transition-colors">
       <div className="text-xs uppercase tracking-wider text-muted-foreground font-mono mb-2">{title}</div>
