@@ -1,0 +1,31 @@
+[PM2] Applying action deleteProcessId on app [ahw-api](ids: [ 0 ])
+[PM2] [ahw-api](0) ✓
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+host metrics | cpu: 0.2% | ram usage: 55.8% | ens3: ⇓ 0mb/s ⇑ 0.002mb/s | disk: ⇓ 0mb/s ⇑ 0.001mb/s |
+[PM2][WARN] Applications ahw-api not running, starting...
+[PM2] App [ahw-api] launched (1 instances)
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ ahw-api    │ default     │ 0.0.0   │ fork    │ 37521    │ 0s     │ 0    │ online    │ 0%       │ 20.8mb   │ ubuntu   │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+host metrics | cpu: 0.2% | ram usage: 55.8% | ens3: ⇓ 0mb/s ⇑ 0.002mb/s | disk: ⇓ 0mb/s ⇑ 0.001mb/s |
+[PM2] Saving current process list...
+[PM2] Successfully saved in /home/ubuntu/.pm2/dump.pm2
+
+Checking API is responding...
+✅ API is working on port 8080
+
+Triggering first data sync from TAB (this takes ~60 seconds)...
+Sync started in background. Check pm2 logs ahw-api in 60 seconds.
+
+PM2 status:
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ ahw-api    │ default     │ 0.0.0   │ fork    │ 37521    │ 5s     │ 0    │ online    │ 0%       │ 150.5mb  │ ubuntu   │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+host metrics | cpu: 0.2% | ram usage: 55.8% | ens3: ⇓ 0mb/s ⇑ 0.002mb/s | disk: ⇓ 0mb/s ⇑ 0.001mb/s |
+ubuntu@aussie-horse-win:~/aussie-horse-win$ 
