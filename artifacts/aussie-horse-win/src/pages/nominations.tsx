@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 
 const HOW_IT_WORKS_SEEN_KEY = 'ahw_how_it_works_seen';
 
+const VIDEO_URL = import.meta.env.VITE_VIDEO_URL as string | undefined;
+
 function HowItWorksBanner() {
   const [open, setOpen] = useState(() => {
     try {
@@ -22,10 +24,10 @@ function HowItWorksBanner() {
       return true;
     }
   });
+  const [videoAvailable, setVideoAvailable] = useState(true);
 
   useEffect(() => {
     if (open) {
-      // Mark as seen once the user expands the banner
       try {
         localStorage.setItem(HOW_IT_WORKS_SEEN_KEY, 'true');
       } catch {
@@ -33,6 +35,10 @@ function HowItWorksBanner() {
       }
     }
   }, [open]);
+
+  // If no video URL is configured for this deployment, hide the banner entirely
+  const videoSrc = VIDEO_URL || '/aussie-horse-win-video/';
+  if (!videoAvailable) return null;
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -55,10 +61,11 @@ function HowItWorksBanner() {
         <div className="border-t border-border">
           <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
             <iframe
-              src="/aussie-horse-win-video/"
+              src={videoSrc}
               title="How Aussie Horse Win works"
               className="absolute inset-0 w-full h-full"
               allow="autoplay"
+              onError={() => setVideoAvailable(false)}
             />
           </div>
         </div>

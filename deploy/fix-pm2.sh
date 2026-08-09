@@ -36,8 +36,11 @@ module.exports = {
 };
 EOF
 
-echo "Restarting API server..."
+echo "Rebuilding API server (compiles latest code changes)..."
 cd "$APP_DIR"
+pnpm --filter @workspace/api-server run build
+
+echo "Restarting API server..."
 pm2 delete ahw-api 2>/dev/null || true
 pm2 start ecosystem.config.cjs
 pm2 save
