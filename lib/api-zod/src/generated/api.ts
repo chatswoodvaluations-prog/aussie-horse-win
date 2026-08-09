@@ -231,7 +231,7 @@ export const UpdateSettingsResponse = zod.object({
 export const GetTracksResponseItem = zod.object({
   "id": zod.int(),
   "name": zod.string(),
-  "state": zod.enum(['VIC', 'NSW']),
+  "state": zod.enum(['VIC', 'NSW', 'QLD', 'SA', 'WA']),
   "type": zod.enum(['Metro', 'Regional', 'Provincial']),
   "enabled": zod.boolean()
 })

@@ -15,6 +15,9 @@ export type TrackState = typeof TrackState[keyof typeof TrackState];
 export const TrackState = {
   VIC: 'VIC',
   NSW: 'NSW',
+  QLD: 'QLD',
+  SA: 'SA',
+  WA: 'WA',
 } as const;
 
 export type TrackType = typeof TrackType[keyof typeof TrackType];

@@ -250,10 +250,10 @@ components:
           type: string
         state:
           type: string
-          enum: [VIC, NSW]
+          enum: [VIC, NSW, QLD, SA, WA]
         type:
           type: string
-          enum: [Regional, Provincial]
+          enum: [Metro, Regional, Provincial]
         enabled:
           type: boolean
       required:
