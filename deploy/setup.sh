@@ -58,7 +58,7 @@ sudo apt-get install -y -qq curl git nginx postgresql postgresql-contrib openssl
 
 # ── 3. Node.js 22 ─────────────────────────────────────────────────────────────
 step "Installing Node.js 22"
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - -qq
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y -qq nodejs
 
 # ── 4. pnpm ───────────────────────────────────────────────────────────────────
