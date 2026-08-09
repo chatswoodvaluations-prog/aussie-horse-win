@@ -29,7 +29,10 @@ function HowItWorksBanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const videoBase = VIDEO_URL || '/aussie-horse-win-video/';
+  // If no video URL is configured (e.g. Oracle deployment), hide the banner entirely.
+  if (!VIDEO_URL) return null;
+
+  const videoBase = VIDEO_URL;
   // Append ?autoplay=1 so the video app starts playing immediately when the
   // banner is expanded, without the visitor needing to press play.
   const videoSrc = `${videoBase}${videoBase.includes('?') ? '&' : '?'}autoplay=1`;
