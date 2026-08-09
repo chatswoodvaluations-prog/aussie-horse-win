@@ -29,7 +29,10 @@ function HowItWorksBanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const videoSrc = VIDEO_URL || '/aussie-horse-win-video/';
+  const videoBase = VIDEO_URL || '/aussie-horse-win-video/';
+  // Append ?autoplay=1 so the video app starts playing immediately when the
+  // banner is expanded, without the visitor needing to press play.
+  const videoSrc = `${videoBase}${videoBase.includes('?') ? '&' : '?'}autoplay=1`;
   if (!videoAvailable) return null;
 
   return (
@@ -546,8 +549,6 @@ function getSeenVideos(): Set<string> {
     return new Set();
   }
 }
-
-const LEGACY_HOW_IT_WORKS_KEY = 'ahw_how_it_works_seen';
 
 function useVideoSeen(id: string): [boolean, () => void] {
   const [seen, setSeen] = useState(() => getSeenVideos().has(id));

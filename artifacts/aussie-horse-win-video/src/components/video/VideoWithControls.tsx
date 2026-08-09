@@ -457,6 +457,21 @@ function PhoneFrame({
 export default function VideoWithControls() {
   const isIframed = typeof window !== 'undefined' && window.self !== window.top;
 
+  // When embedded with ?autoplay=1 just render the animation directly — muted,
+  // looping, no control chrome — so the banner visitor sees the video start
+  // immediately without needing to interact.
+  const autoplay =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('autoplay') === '1';
+
+  if (isIframed && autoplay) {
+    return (
+      <div className="w-full h-screen">
+        <VideoTemplate loop muted />
+      </div>
+    );
+  }
+
   const {
     sceneKeys,
     activeIndex,
