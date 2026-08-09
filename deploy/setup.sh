@@ -25,11 +25,6 @@ echo ""
 
 read -p "Your GitHub username (e.g. johnsmith): " GITHUB_USER
 read -p "Your GitHub repo name (e.g. aussie-horse-win): " GITHUB_REPO
-read -p "NordVPN SOCKS5 username: " NORDVPN_USER
-read -s -p "NordVPN SOCKS5 password: " NORDVPN_PASS
-echo ""
-read -p "NordVPN AU server host [press Enter for default: au1025.nordvpn.com]: " NORDVPN_HOST
-NORDVPN_HOST="${NORDVPN_HOST:-au1025.nordvpn.com}"
 
 SESSION_SECRET=$(openssl rand -hex 32)
 DB_PASSWORD=$(openssl rand -hex 16)
@@ -100,10 +95,6 @@ NODE_ENV=production
 PORT=8080
 DATABASE_URL=${DATABASE_URL}
 SESSION_SECRET=${SESSION_SECRET}
-NORDVPN_SOCKS5_USER=${NORDVPN_USER}
-NORDVPN_SOCKS5_PASS=${NORDVPN_PASS}
-NORDVPN_SOCKS5_HOST=${NORDVPN_HOST}
-NORDVPN_SOCKS5_PORT=1080
 EOF
 chmod 600 "$APP_DIR/.env.production"
 
