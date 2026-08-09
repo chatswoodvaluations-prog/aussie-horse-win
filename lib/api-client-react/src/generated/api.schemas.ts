@@ -21,6 +21,7 @@ export type TrackType = typeof TrackType[keyof typeof TrackType];
 
 
 export const TrackType = {
+  Metro: 'Metro',
   Regional: 'Regional',
   Provincial: 'Provincial',
 } as const;

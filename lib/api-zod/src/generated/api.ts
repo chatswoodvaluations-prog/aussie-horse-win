@@ -232,7 +232,7 @@ export const GetTracksResponseItem = zod.object({
   "id": zod.int(),
   "name": zod.string(),
   "state": zod.enum(['VIC', 'NSW']),
-  "type": zod.enum(['Regional', 'Provincial']),
+  "type": zod.enum(['Metro', 'Regional', 'Provincial']),
   "enabled": zod.boolean()
 })
 export const GetTracksResponse = zod.array(GetTracksResponseItem)
