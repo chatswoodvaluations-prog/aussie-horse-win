@@ -442,6 +442,25 @@ export default function PerformanceDashboard() {
   );
 }
 
+// ─── P&L Chart helpers ────────────────────────────────────────────────────────
+
+/** Pure function extracted from PnlChart useMemo so it can be unit-tested. */
+export function buildChartData(history: BetResult[]) {
+  if (!history?.length) return [];
+  const sorted = [...history].sort(
+    (a, b) => new Date(a.raceDate).getTime() - new Date(b.raceDate).getTime()
+  );
+  let running = 0;
+  return sorted.map((bet) => {
+    running += bet.netResult;
+    return {
+      date: bet.raceDate.split('T')[0],
+      cumPnl: parseFloat(running.toFixed(2)),
+      label: `${bet.horseName} @ ${bet.trackName}`,
+    };
+  });
+}
+
 // ─── P&L Chart ───────────────────────────────────────────────────────────────
 
 const pnlChartConfig = {
@@ -457,21 +476,7 @@ function PnlChart({
   isLoading: boolean;
   isFiltered: boolean;
 }) {
-  const chartData = useMemo(() => {
-    if (!history?.length) return [];
-    const sorted = [...history].sort(
-      (a, b) => new Date(a.raceDate).getTime() - new Date(b.raceDate).getTime()
-    );
-    let running = 0;
-    return sorted.map((bet) => {
-      running += bet.netResult;
-      return {
-        date: bet.raceDate.split('T')[0],
-        cumPnl: parseFloat(running.toFixed(2)),
-        label: `${bet.horseName} @ ${bet.trackName}`,
-      };
-    });
-  }, [history]);
+  const chartData = useMemo(() => buildChartData(history), [history]);
 
   return (
     <Card className="border-border bg-card">
