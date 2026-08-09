@@ -1,6 +1,6 @@
 ---
 name: Oracle VPS deployment
-description: Oracle Cloud Sydney server details, key decisions, and TAB API connectivity findings
+description: Oracle Cloud Sydney server details, key decisions, and data source findings
 ---
 
 ## Server
@@ -8,6 +8,7 @@ description: Oracle Cloud Sydney server details, key decisions, and TAB API conn
 - OS: Ubuntu, user: ubuntu
 - SSH key: "ssh-key-2026-08-09 (2).key" in Oracle Cloud Shell home (~/)
 - Oracle console URL: https://console.ap-sydney-1.oraclecloud.com/
+- Cloud Shell user: chatswoodv@cloudshell (tenancy: chatswoodvaluations)
 
 ## GitHub
 - Account: chatswoodvaluations-prog
@@ -16,27 +17,28 @@ description: Oracle Cloud Sydney server details, key decisions, and TAB API conn
 ## PM2
 - Process name: ahw-api
 - Config file: ~/aussie-horse-win/ecosystem.config.cjs
-- Must include PORT, DATABASE_URL, SESSION_SECRET, NORDVPN_SOCKS5_USER, NORDVPN_SOCKS5_PASS
-- Fix script: deploy/fix-pm2.sh (rebuilds API then restarts PM2)
+- Must include PORT, DATABASE_URL, SESSION_SECRET
+- Fix/update script: deploy/fix-pm2.sh (rebuilds API + frontend then restarts PM2)
 
-## TAB API geo-restriction — critical finding
-- TAB API (api.tab.com.au) blocks Oracle Cloud datacenter IPs even from Sydney region
-- Solution: route via NordVPN SOCKS5 proxy (au1025.nordvpn.com:1080)
-- Credentials are Replit secrets NORDVPN_SOCKS5_USER / NORDVPN_SOCKS5_PASS
-- These must be added to ~/aussie-horse-win/.env.production on the Oracle server
-- The tabFetcher automatically uses proxy when both vars are set
+## Data source resolution — critical finding
+- TAB API (api.tab.com.au): BLOCKED from Oracle Cloud IPs — HTTP 000 (connection refused)
+- Ladbrokes API (api.ladbrokes.com.au): WORKS from Oracle AU IP — returns real race cards
+- Solution: sync engine tries TAB → Ladbrokes → mock (in order)
+- Ladbrokes provides: real tracks, real horse names, real win/place odds
+- Confirmed working: Port Macquarie, Ascot, Mildura, Cairns, Mackay, Newcastle etc.
 
-**Why:** Oracle Cloud's public IPs are in known datacenter ranges — the TAB API geo-blocks
-these even in AU. NordVPN AU endpoints appear as residential IPs and bypass the block.
+**Why:** TAB API uses Akamai geo-restriction that blocks known datacenter IP ranges even
+in AU. Ladbrokes AU API is accessible from Oracle's Sydney datacenter IP.
 
-**How to apply:** Any future server deploy needs NORDVPN_SOCKS5_USER+PASS in .env.production.
-The ecosystem.config.cjs generator in fix-pm2.sh/setup.sh already reads and passes them through.
+**How to apply:** No NordVPN needed. Ladbrokes fallback is automatic in sync.ts.
+The sync logs will show "source: ladbrokes" on success.
 
-## Firewall note
-- Oracle has a hidden second firewall (iptables) beyond the VCN security list
-- iptables rules added with `sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT` don't survive reboot
-- setup.sh uses UFW which persists correctly — prefer that path
+## Frontend rebuild
+- fix-pm2.sh now rebuilds BOTH API and frontend
+- Frontend built with VITE_VIDEO_URL="" (hides video banner) and BASE_PATH="/"
+- Video artifact only exists on Replit, not Oracle — hiding it is correct behaviour
 
-## User still needs to do
-- Add NORDVPN_SOCKS5_USER and NORDVPN_SOCKS5_PASS to ~/aussie-horse-win/.env.production
-- Then run: cd ~/aussie-horse-win && git pull && bash deploy/fix-pm2.sh
+## Firewall
+- Oracle has a hidden iptables firewall beyond the VCN security list
+- setup.sh uses UFW which persists correctly
+- Port 80 open via UFW (allow 80/tcp)
