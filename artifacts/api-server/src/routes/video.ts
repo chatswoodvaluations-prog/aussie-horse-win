@@ -84,6 +84,66 @@ let renderInFlight = false;
 const rateLimitMap = new Map<string, number>();
 const RATE_WINDOW_MS = 2 * 60 * 1_000; // 2 min between renders per IP
 
+// ─── MP4 Cache ────────────────────────────────────────────────────────────────
+
+/**
+ * The rendered MP4 is cached on disk so repeat downloads skip the 40-second
+ * headless-browser + ffmpeg pipeline entirely.
+ *
+ * Cache key strategy: the video has no user-supplied parameters, so a single
+ * fixed file is used. Staleness is detected two ways:
+ *  a) The cached file is older than CACHE_TTL_MS (24 h).
+ *  b) The video source build directory has been modified more recently than
+ *     the cached file (i.e. the video was rebuilt since the last render).
+ */
+const CACHE_TTL_MS = 24 * 60 * 60 * 1_000; // 24 hours
+const CACHE_DIR    = path.join(os.tmpdir(), "video-render-cache");
+const CACHE_FILE   = path.join(CACHE_DIR, "aussie-horse-win.mp4");
+
+/** Ensure the cache directory exists. */
+function ensureCacheDir(): void {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+}
+
+/**
+ * Returns true when a fresh cached MP4 exists that can be served immediately.
+ * "Fresh" means: file exists, not older than CACHE_TTL_MS, and the video
+ * source build has not been modified since the render.
+ */
+function isCacheValid(): boolean {
+  if (!fs.existsSync(CACHE_FILE)) return false;
+
+  const cacheStat = fs.statSync(CACHE_FILE);
+  const ageMs = Date.now() - cacheStat.mtimeMs;
+  if (ageMs > CACHE_TTL_MS) return false;
+
+  // Invalidate when the video source has been rebuilt more recently
+  const indexHtml = path.join(VIDEO_BUILD_DIR, "index.html");
+  if (fs.existsSync(indexHtml)) {
+    const buildStat = fs.statSync(indexHtml);
+    if (buildStat.mtimeMs > cacheStat.mtimeMs) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Copy a freshly-rendered MP4 into the cache directory.
+ * Any copy failure is logged but not propagated — the caller's copy is
+ * streamed regardless.
+ */
+function populateCache(renderedPath: string): void {
+  try {
+    ensureCacheDir();
+    fs.copyFileSync(renderedPath, CACHE_FILE);
+    logger.info({ CACHE_FILE }, "MP4 cached for future requests");
+  } catch (err) {
+    logger.warn(err, "Failed to cache rendered MP4 — next request will re-render");
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function clientIp(req: Request): string {
@@ -212,6 +272,22 @@ function startLocalVideoServer(): Promise<{ port: number; close: () => void }> {
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 router.get("/video/render", async (req: Request, res: Response) => {
+  // ── 0. Cache hit — serve immediately without rendering ───────────────────
+  if (isCacheValid()) {
+    logger.info({ CACHE_FILE }, "Serving MP4 from cache");
+    const stat = fs.statSync(CACHE_FILE);
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="aussie-horse-win.mp4"',
+    );
+    res.setHeader("Content-Length", stat.size);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Cache", "HIT");
+    fs.createReadStream(CACHE_FILE).pipe(res);
+    return;
+  }
+
   // ── 1. Concurrency gate ──────────────────────────────────────────────────
   if (renderInFlight) {
     res.status(429).json({
@@ -439,8 +515,9 @@ router.get("/video/render", async (req: Request, res: Response) => {
 
     if (aborted) return;
 
-    // ── 12. Stream response ──────────────────────────────────────────────
-    logger.info({ outputPath }, "Encoding complete, streaming response");
+    // ── 12. Populate cache, then stream response ─────────────────────────
+    logger.info({ outputPath }, "Encoding complete, caching and streaming response");
+    populateCache(outputPath);
     const stat = fs.statSync(outputPath);
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader(
@@ -449,6 +526,7 @@ router.get("/video/render", async (req: Request, res: Response) => {
     );
     res.setHeader("Content-Length", stat.size);
     res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Cache", "MISS");
 
     const readStream = fs.createReadStream(outputPath);
     readStream.pipe(res);
