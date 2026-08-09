@@ -42,11 +42,13 @@ echo "Rebuilding API server (compiles latest code changes)..."
 cd "$APP_DIR"
 pnpm --filter @workspace/api-server run build
 
+echo "Stopping API server to free RAM for frontend build..."
+pm2 delete ahw-api 2>/dev/null || true
+
 echo "Rebuilding web frontend (applies latest UI changes)..."
 VITE_VIDEO_URL="" BASE_PATH="/" pnpm --filter @workspace/aussie-horse-win run build
 
-echo "Restarting API server..."
-pm2 delete ahw-api 2>/dev/null || true
+echo "Starting API server..."
 pm2 start ecosystem.config.cjs
 pm2 save
 
