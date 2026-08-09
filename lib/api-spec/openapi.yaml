@@ -384,6 +384,12 @@ components:
           type: number
         placeOdds:
           type: number
+        ladbrokesWinOdds:
+          type: ["number", "null"]
+          description: Ladbrokes fixed-odds win price — null when Ladbrokes does not quote this runner
+        ladbrokesPlaceOdds:
+          type: ["number", "null"]
+          description: Ladbrokes fixed-odds place price — null when Ladbrokes does not quote this runner
         winStake:
           type: number
         placeStake:

@@ -10,6 +10,10 @@ export const runnersTable = pgTable("runners", {
   speedMapPosition: text("speed_map_position").notNull(), // Lead, On-Pace, Handy, Midfield, Back-Marker
   winOdds: real("win_odds").notNull(),
   placeOdds: real("place_odds").notNull(),
+  /** Ladbrokes fixed-odds win price — null when not available */
+  ladbrokesWinOdds: real("ladbrokes_win_odds"),
+  /** Ladbrokes fixed-odds place price — null when not available */
+  ladbrokesPlaceOdds: real("ladbrokes_place_odds"),
   jockey: text("jockey"),
   trainer: text("trainer"),
   passed: boolean("passed").notNull().default(false),

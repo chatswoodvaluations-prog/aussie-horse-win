@@ -111,7 +111,7 @@ pnpm --filter @workspace/aussie-horse-win run build
 step "Setting up database tables"
 cd "$APP_DIR"
 export $(cat .env.production | xargs)
-pnpm --filter @workspace/db run migrate 2>/dev/null || true
+pnpm --filter @workspace/db run migrate
 
 # ── 11. PM2 — keep the API server running ─────────────────────────────────────
 step "Starting the app with PM2"

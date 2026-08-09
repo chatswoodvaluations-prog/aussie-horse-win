@@ -27,6 +27,8 @@ router.get("/nominations", async (req, res): Promise<void> => {
     speedMapPosition: nominations.speedMapPosition,
     winOdds: nominations.winOdds,
     placeOdds: nominations.placeOdds,
+    ladbrokesWinOdds: nominations.ladbrokesWinOdds ?? null,
+    ladbrokesPlaceOdds: nominations.ladbrokesPlaceOdds ?? null,
     winStake: nominations.winStake,
     placeStake: nominations.placeStake,
     totalOutlay: nominations.totalOutlay,

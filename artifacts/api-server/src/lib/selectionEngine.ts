@@ -181,6 +181,8 @@ export async function runSelectionEngine(): Promise<{
             speedMapPosition: runner.speedMapPosition,
             winOdds: runner.winOdds,
             placeOdds: runner.placeOdds,
+            ladbrokesWinOdds: runner.ladbrokesWinOdds ?? null,
+            ladbrokesPlaceOdds: runner.ladbrokesPlaceOdds ?? null,
             winStake: settings.winStake,
             placeStake: settings.placeStake,
             totalOutlay: settings.winStake + settings.placeStake,

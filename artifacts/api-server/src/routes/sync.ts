@@ -5,6 +5,7 @@ import { db, tracksTable, racesTable, runnersTable, nominationsTable } from "@wo
 import { and, eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { fetchLiveRaceCards, getSydneyDateStrings, type LiveMeeting } from "../lib/tabFetcher";
+import { fetchLadbrokesOdds, normaliseKey as normaliseForLadbrokes, type LadbrokesOddsMap } from "../lib/ladbrokesFetcher";
 import { sendNominationAlert, type NominationSummaryRow } from "../lib/emailService";
 
 const router = Router();
@@ -338,6 +339,91 @@ async function insertMockRaceCards(
   return { racesAdded, runnersAdded };
 }
 
+// ── Ladbrokes odds applicator ────────────────────────────────────────────────
+
+/**
+ * Apply Ladbrokes odds to runner rows and keep any existing pending nominations
+ * in sync.  Uses the race date when looking up the Ladbrokes map so identical
+ * race numbers at the same venue on different days never collide.
+ *
+ * Only pending nominations are updated — settled records (Won/Placed/Unplaced)
+ * preserve the prices that were live at bet-time.
+ */
+async function applyLadbrokesOdds(
+  ladbrokesMap: LadbrokesOddsMap,
+  tracks: { id: number; name: string; state: string }[]
+): Promise<void> {
+  let runnersUpdated = 0;
+  let nominationsUpdated = 0;
+
+  const allRaces = await db.select().from(racesTable);
+
+  for (const race of allRaces) {
+    const track = tracks.find((t) => t.id === race.trackId);
+    if (!track) continue;
+
+    // Use the same normaliseKey function as the fetcher so suffix/case variation
+    // in TAB venue names matches Ladbrokes venue names consistently.
+    const venueKey = normaliseForLadbrokes(track.name);
+    // Use raceDate as the outer key to avoid cross-date collisions
+    const raceMap = ladbrokesMap.get(race.raceDate)?.get(venueKey)?.get(race.raceNumber);
+    if (!raceMap) continue;
+
+    const runners = await db
+      .select()
+      .from(runnersTable)
+      .where(eq(runnersTable.raceId, race.id));
+
+    for (const runner of runners) {
+      // Use the same normaliser as the Ladbrokes fetcher so that suffix
+      // variations like "(AUS)" are stripped before comparison.
+      const horseKey = normaliseForLadbrokes(runner.horseName);
+      const ladsOdds = raceMap.get(horseKey);
+
+      if (!ladsOdds) continue;
+
+      // Update the runner row
+      await db
+        .update(runnersTable)
+        .set({
+          ladbrokesWinOdds: ladsOdds.winOdds,
+          ladbrokesPlaceOdds: ladsOdds.placeOdds,
+        })
+        .where(eq(runnersTable.id, runner.id));
+      runnersUpdated++;
+
+      // Also update any *pending* nominations linked to this runner so the
+      // card immediately shows the fresh price.  Settled records are untouched
+      // so historical P&L calculations remain accurate.
+      const pendingNoms = await db
+        .select()
+        .from(nominationsTable)
+        .where(
+          and(
+            eq(nominationsTable.runnerId, runner.id),
+            eq(nominationsTable.status, "Pending")
+          )
+        );
+
+      for (const nom of pendingNoms) {
+        await db
+          .update(nominationsTable)
+          .set({
+            ladbrokesWinOdds: ladsOdds.winOdds,
+            ladbrokesPlaceOdds: ladsOdds.placeOdds,
+          })
+          .where(eq(nominationsTable.id, nom.id));
+        nominationsUpdated++;
+      }
+    }
+  }
+
+  logger.info(
+    { runnersUpdated, nominationsUpdated },
+    "Sync: Ladbrokes odds applied to runners and pending nominations"
+  );
+}
+
 // ── Route ────────────────────────────────────────────────────────────────────
 
 router.post("/sync", async (req, res): Promise<void> => {
@@ -395,6 +481,63 @@ router.post("/sync", async (req, res): Promise<void> => {
     runnersAdded = counts.runnersAdded;
     dataSource = "mock";
   }
+
+  // ── Fetch and store Ladbrokes odds (best-effort, bounded 30 s total) ────────
+  // All dates are fetched in parallel. The entire Ladbrokes enrichment — fetch
+  // + apply — must complete within LADBROKES_BUDGET_MS or it is aborted so the
+  // selection engine is never delayed by an unresponsive odds feed.
+  const LADBROKES_BUDGET_MS = 30_000;
+
+  await Promise.race([
+    // Actual work — parallel fetch across all dates
+    (async () => {
+      try {
+        const results = await Promise.allSettled(
+          dates.map((date) => fetchLadbrokesOdds(date))
+        );
+
+        // Merge successful day-maps; log and skip any that rejected.
+        const combinedLadbrokesMap: LadbrokesOddsMap = new Map();
+        for (let i = 0; i < results.length; i++) {
+          const result = results[i];
+          if (result.status === "rejected") {
+            logger.warn(
+              { date: dates[i], err: result.reason },
+              "Sync: Ladbrokes odds fetch failed for date — skipping"
+            );
+            continue;
+          }
+          for (const [dateKey, venueMap] of result.value) {
+            if (!combinedLadbrokesMap.has(dateKey)) {
+              combinedLadbrokesMap.set(dateKey, new Map());
+            }
+            const combined = combinedLadbrokesMap.get(dateKey)!;
+            for (const [venue, racesMap] of venueMap) {
+              combined.set(venue, racesMap);
+            }
+          }
+        }
+
+        if (combinedLadbrokesMap.size > 0) {
+          await applyLadbrokesOdds(combinedLadbrokesMap, tracks);
+        }
+      } catch (err) {
+        logger.warn({ err }, "Sync: Ladbrokes enrichment failed — prices will show as unavailable");
+      }
+    })(),
+
+    // Hard deadline — resolves (not rejects) after budget expires so sync
+    // always continues to the selection engine regardless of Ladbrokes health.
+    new Promise<void>((resolve) =>
+      setTimeout(() => {
+        logger.warn(
+          { budgetMs: LADBROKES_BUDGET_MS },
+          "Sync: Ladbrokes budget exceeded — proceeding without Ladbrokes prices"
+        );
+        resolve();
+      }, LADBROKES_BUDGET_MS)
+    ),
+  ]);
 
   // Run the selection engine regardless of data source
   const engineResult = await runSelectionEngine();

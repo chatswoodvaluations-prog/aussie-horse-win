@@ -25,6 +25,16 @@ export interface Nomination {
   speedMapPosition: string;
   winOdds: number;
   placeOdds: number;
+  /**
+   * Ladbrokes fixed-odds win price — null when Ladbrokes does not quote this runner
+   * @nullable
+   */
+  ladbrokesWinOdds?: number | null;
+  /**
+   * Ladbrokes fixed-odds place price — null when Ladbrokes does not quote this runner
+   * @nullable
+   */
+  ladbrokesPlaceOdds?: number | null;
   winStake: number;
   placeStake: number;
   totalOutlay: number;

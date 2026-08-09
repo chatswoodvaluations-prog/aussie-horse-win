@@ -8,7 +8,7 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --import tsx/esm src/lib/tabFetcher.test.ts src/routes/sync.persistence.test.ts"
+    "test": "node --test --import tsx/esm src/lib/ladbrokesFetcher.test.ts src/lib/tabFetcher.test.ts src/routes/sync.persistence.test.ts"
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.1",

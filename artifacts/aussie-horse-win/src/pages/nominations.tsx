@@ -364,7 +364,7 @@ function NominationCard({ nom }: { nom: Nomination }) {
       </CardHeader>
       
       <CardContent className="p-4 pt-4 flex-1 flex flex-col">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-6 bg-secondary/30 p-3 rounded-md">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3 bg-secondary/30 p-3 rounded-md">
           <div>
             <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-mono">Barrier</div>
             <div className="font-mono flex items-center gap-1.5 font-bold">
@@ -385,6 +385,9 @@ function NominationCard({ nom }: { nom: Nomination }) {
             <div className="font-mono font-bold text-foreground/80">${nom.placeOdds.toFixed(2)}</div>
           </div>
         </div>
+
+        {/* Bookmaker odds comparison */}
+        <OddsComparisonRow nom={nom} />
 
         <div className="mt-auto border-t border-border pt-4">
           <div className="flex justify-between items-end mb-2">
@@ -411,6 +414,83 @@ function NominationCard({ nom }: { nom: Nomination }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Displays a side-by-side TAB vs Ladbrokes odds comparison row.
+ * - Green highlight when Ladbrokes > TAB (better deal)
+ * - Dimmed when Ladbrokes < TAB
+ * - "—" when Ladbrokes price is not available
+ */
+function OddsComparisonRow({ nom }: { nom: Nomination }) {
+  const hasLads = nom.ladbrokesWinOdds != null || nom.ladbrokesPlaceOdds != null;
+
+  const winDiff = nom.ladbrokesWinOdds != null
+    ? nom.ladbrokesWinOdds - nom.winOdds
+    : null;
+  const placeDiff = nom.ladbrokesPlaceOdds != null
+    ? nom.ladbrokesPlaceOdds - nom.placeOdds
+    : null;
+
+  const winBetter = winDiff != null && winDiff > 0.01;
+  const winWorse  = winDiff != null && winDiff < -0.01;
+  const placeBetter = placeDiff != null && placeDiff > 0.01;
+  const placeWorse  = placeDiff != null && placeDiff < -0.01;
+
+  return (
+    <div className="mb-6 rounded-md border border-border/50 overflow-hidden">
+      {/* Header row */}
+      <div className="grid grid-cols-3 bg-secondary/50 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+        <span></span>
+        <span className="text-center">TAB</span>
+        <span className="text-center">LADS</span>
+      </div>
+
+      {/* Win row */}
+      <div className="grid grid-cols-3 px-3 py-2 items-center border-t border-border/30">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Win</span>
+        <span className="text-center font-mono font-bold text-sm text-primary">
+          ${nom.winOdds.toFixed(2)}
+        </span>
+        <span className={cn(
+          "text-center font-mono font-bold text-sm",
+          !hasLads && nom.ladbrokesWinOdds == null
+            ? "text-muted-foreground/40"
+            : winBetter
+              ? "text-emerald-400"
+              : winWorse
+                ? "text-muted-foreground/50"
+                : "text-foreground/80"
+        )}>
+          {nom.ladbrokesWinOdds != null
+            ? `$${nom.ladbrokesWinOdds.toFixed(2)}${winBetter ? ` ▲${winDiff!.toFixed(2)}` : ''}`
+            : "—"}
+        </span>
+      </div>
+
+      {/* Place row */}
+      <div className="grid grid-cols-3 px-3 py-2 items-center border-t border-border/30">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Place</span>
+        <span className="text-center font-mono font-bold text-sm text-foreground/80">
+          ${nom.placeOdds.toFixed(2)}
+        </span>
+        <span className={cn(
+          "text-center font-mono font-bold text-sm",
+          !hasLads && nom.ladbrokesPlaceOdds == null
+            ? "text-muted-foreground/40"
+            : placeBetter
+              ? "text-emerald-400"
+              : placeWorse
+                ? "text-muted-foreground/50"
+                : "text-foreground/80"
+        )}>
+          {nom.ladbrokesPlaceOdds != null
+            ? `$${nom.ladbrokesPlaceOdds.toFixed(2)}${placeBetter ? ` ▲${placeDiff!.toFixed(2)}` : ''}`
+            : "—"}
+        </span>
+      </div>
+    </div>
   );
 }
 

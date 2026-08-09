@@ -17,6 +17,10 @@ export const nominationsTable = pgTable("nominations", {
   speedMapPosition: text("speed_map_position").notNull(),
   winOdds: real("win_odds").notNull(),
   placeOdds: real("place_odds").notNull(),
+  /** Ladbrokes fixed-odds win price — null when not available */
+  ladbrokesWinOdds: real("ladbrokes_win_odds"),
+  /** Ladbrokes fixed-odds place price — null when not available */
+  ladbrokesPlaceOdds: real("ladbrokes_place_odds"),
   winStake: real("win_stake").notNull().default(5),
   placeStake: real("place_stake").notNull().default(20),
   totalOutlay: real("total_outlay").notNull().default(25),

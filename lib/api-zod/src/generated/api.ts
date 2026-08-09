@@ -36,6 +36,8 @@ export const GetNominationsResponseItem = zod.object({
   "speedMapPosition": zod.string(),
   "winOdds": zod.number(),
   "placeOdds": zod.number(),
+  "ladbrokesWinOdds": zod.number().nullable().nullish().describe('Ladbrokes fixed-odds win price — null when Ladbrokes does not quote this runner'),
+  "ladbrokesPlaceOdds": zod.number().nullable().nullish().describe('Ladbrokes fixed-odds place price — null when Ladbrokes does not quote this runner'),
   "winStake": zod.number(),
   "placeStake": zod.number(),
   "totalOutlay": zod.number(),
