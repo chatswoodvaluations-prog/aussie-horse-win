@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Monitor, Repeat, Smartphone, Volume2, VolumeX } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Monitor, Repeat, Smartphone, Volume2, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import VideoTemplate, { SCENE_DURATIONS } from './VideoTemplate';
@@ -6,6 +6,13 @@ import { useSceneControls } from './useSceneControls';
 
 const PROGRESS_TICK_MS = 60;
 type ViewMode = 'desktop' | 'mobile';
+type DownloadState = 'idle' | 'rendering' | 'error';
+
+// Build the API base URL from the current origin (works behind the Replit proxy)
+function getApiBase(): string {
+  if (typeof window === 'undefined') return '';
+  return `${window.location.protocol}//${window.location.host}`;
+}
 
 // ─── Progress segments ────────────────────────────────────────────────────────
 
@@ -73,10 +80,12 @@ interface ControlBarProps {
   activeIndex: number;
   activeDuration: number;
   tick: number;
+  downloadState: DownloadState;
   onToggleLock: () => void;
   onToggleMute: () => void;
   onJumpTo: (index: number) => void;
   onToggleCollapsed: () => void;
+  onDownload: () => void;
 }
 
 function OverlayControlBar({
@@ -88,10 +97,12 @@ function OverlayControlBar({
   activeIndex,
   activeDuration,
   tick,
+  downloadState,
   onToggleLock,
   onToggleMute,
   onJumpTo,
   onToggleCollapsed,
+  onDownload,
 }: ControlBarProps) {
   return (
     <div
@@ -119,6 +130,8 @@ function OverlayControlBar({
       <div className="text-xl text-white/60 font-mono tabular-nums shrink-0">
         {activeIndex + 1}/{sceneKeys.length}
       </div>
+      <div className="w-px self-stretch bg-white/15" />
+      <DownloadBtn downloadState={downloadState} onDownload={onDownload} size="lg" />
       <IconBtn onClick={onToggleCollapsed} title={collapsed ? 'Show controls' : 'Hide controls'} aria-expanded={!collapsed}>
         {collapsed ? <ChevronUp className="w-10 h-10" /> : <ChevronDown className="w-10 h-10" />}
       </IconBtn>
@@ -135,9 +148,11 @@ function MobileControlBar({
   activeIndex,
   activeDuration,
   tick,
+  downloadState,
   onToggleLock,
   onToggleMute,
   onJumpTo,
+  onDownload,
 }: Omit<ControlBarProps, 'visible' | 'collapsed' | 'onToggleCollapsed'>) {
   return (
     <div className="flex items-center gap-2 bg-black px-3 py-2.5">
@@ -159,7 +174,108 @@ function MobileControlBar({
       <div className="text-[11px] text-white/50 font-mono tabular-nums shrink-0">
         {activeIndex + 1}/{sceneKeys.length}
       </div>
+      <div className="w-px self-stretch bg-white/15" />
+      <DownloadBtn downloadState={downloadState} onDownload={onDownload} size="sm" />
     </div>
+  );
+}
+
+// ─── Download button ──────────────────────────────────────────────────────────
+
+function DownloadBtn({
+  downloadState,
+  onDownload,
+  size,
+}: {
+  downloadState: DownloadState;
+  onDownload: () => void;
+  size: 'sm' | 'lg';
+}) {
+  const isRendering = downloadState === 'rendering';
+  const isError = downloadState === 'error';
+
+  const title = isRendering
+    ? 'Rendering MP4… this takes ~40 s'
+    : isError
+    ? 'Render failed — click to retry'
+    : 'Download MP4';
+
+  if (size === 'lg') {
+    return (
+      <button
+        onClick={onDownload}
+        disabled={isRendering}
+        title={title}
+        aria-label={title}
+        className={`flex items-center gap-2 px-4 h-14 rounded-lg shrink-0 text-sm font-mono tracking-wide transition-all ${
+          isRendering
+            ? 'bg-white/10 text-white/40 cursor-wait'
+            : isError
+            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+            : 'bg-[#00ff41]/15 text-[#00ff41] hover:bg-[#00ff41]/25 border border-[#00ff41]/30'
+        }`}
+      >
+        {isRendering ? (
+          <>
+            <SpinnerIcon className="w-5 h-5" />
+            Rendering…
+          </>
+        ) : (
+          <>
+            <Download className="w-5 h-5" />
+            {isError ? 'Retry MP4' : 'Download MP4'}
+          </>
+        )}
+      </button>
+    );
+  }
+
+  // Small (mobile)
+  return (
+    <button
+      onClick={onDownload}
+      disabled={isRendering}
+      title={title}
+      aria-label={title}
+      className={`w-8 h-8 flex items-center justify-center rounded-md shrink-0 transition-colors ${
+        isRendering
+          ? 'text-white/30 cursor-wait'
+          : isError
+          ? 'text-red-400 hover:bg-red-500/20'
+          : 'text-[#00ff41] hover:bg-[#00ff41]/15'
+      }`}
+    >
+      {isRendering ? (
+        <SpinnerIcon className="w-4 h-4" />
+      ) : (
+        <Download className="w-4 h-4" />
+      )}
+    </button>
+  );
+}
+
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={`animate-spin ${className ?? ''}`}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
   );
 }
 
@@ -359,8 +475,43 @@ export default function VideoWithControls() {
   const [hovering, setHovering] = useState(false);
   const [tapPinned, setTapPinned] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [downloadState, setDownloadState] = useState<DownloadState>('idle');
 
   const sensorRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Download handler ──────────────────────────────────────────────────────
+  const handleDownload = useCallback(async () => {
+    if (downloadState === 'rendering') return;
+    setDownloadState('rendering');
+
+    try {
+      // The render target is derived server-side; no URL is passed by the client.
+      const apiUrl = `${getApiBase()}/api/video/render`;
+
+      const response = await fetch(apiUrl, {
+        signal: AbortSignal.timeout(180_000), // 3 min
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Server error ${response.status}: ${body}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = 'aussie-horse-win.mp4';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+      setDownloadState('idle');
+    } catch (err) {
+      console.error('Download failed:', err);
+      setDownloadState('error');
+    }
+  }, [downloadState]);
 
   const handlePointerEnter = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse') setHovering(true);
@@ -405,9 +556,11 @@ export default function VideoWithControls() {
     activeIndex,
     activeDuration,
     tick,
+    downloadState,
     onToggleLock: toggleLock,
     onToggleMute: () => setMuted((m) => !m),
     onJumpTo: jumpTo,
+    onDownload: handleDownload,
   };
 
   // Export path — no controls, audio unmuted, full screen
@@ -479,10 +632,12 @@ export default function VideoWithControls() {
           activeIndex={activeIndex}
           activeDuration={activeDuration}
           tick={tick}
+          downloadState={downloadState}
           onToggleLock={toggleLock}
           onToggleMute={() => setMuted((m) => !m)}
           onJumpTo={jumpTo}
           onToggleCollapsed={handleToggleCollapsed}
+          onDownload={handleDownload}
         />
       </div>
     </div>

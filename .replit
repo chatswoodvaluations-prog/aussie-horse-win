@@ -24,3 +24,6 @@ timeoutMs = 20000
 [userenv.shared]
 NORDVPN_SOCKS5_HOST = "au1025.nordvpn.com"
 NORDVPN_SOCKS5_PORT = "1080"
+
+[nix]
+channel = "stable-25_05"

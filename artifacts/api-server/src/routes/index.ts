@@ -6,6 +6,7 @@ import nominationsRouter from "./nominations";
 import performanceRouter from "./performance";
 import settingsRouter from "./settings";
 import syncRouter from "./sync";
+import videoRouter from "./video";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(nominationsRouter);
 router.use(performanceRouter);
 router.use(settingsRouter);
 router.use(syncRouter);
+router.use(videoRouter);
 
 export default router;
