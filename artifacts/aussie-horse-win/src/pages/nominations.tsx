@@ -589,7 +589,7 @@ function TrophyIcon(props: any) {
  */
 const VIDEOS_SEEN_KEY = 'ahw_videos_seen';
 
-function getSeenVideos(): Set<string> {
+export function getSeenVideos(): Set<string> {
   try {
     const raw = localStorage.getItem(VIDEOS_SEEN_KEY);
     const ids: string[] = raw ? JSON.parse(raw) : [];
@@ -619,7 +619,7 @@ function useVideoSeen(id: string): [boolean, () => void] {
   return [seen, markSeen];
 }
 
-function markVideoSeen(id: string): void {
+export function markVideoSeen(id: string): void {
   try {
     const set = getSeenVideos();
     set.add(id);
