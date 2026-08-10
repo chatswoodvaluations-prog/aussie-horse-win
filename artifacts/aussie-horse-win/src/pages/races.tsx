@@ -100,12 +100,7 @@ function RaceRow({ race, nominationByRunnerId }: { race: Race; nominationByRunne
                 <Badge variant="outline" className="text-[10px] h-5 uppercase px-1.5 font-mono">
                   {race.state}
                 </Badge>
-                {race.dataSource === 'ladbrokes' ? (
-                  <Badge variant="outline" className="font-mono text-[10px] uppercase bg-blue-500/10 text-blue-400 border-blue-500/30 flex items-center gap-1">
-                    <Wifi className="size-2.5" />
-                    Ladbrokes live
-                  </Badge>
-                ) : race.dataSource === 'live' ? (
+                {race.dataSource === 'live' ? (
                   <Badge variant="outline" className="font-mono text-[10px] uppercase bg-blue-500/10 text-blue-400 border-blue-500/30 flex items-center gap-1">
                     <Wifi className="size-2.5" />
                     Live odds
