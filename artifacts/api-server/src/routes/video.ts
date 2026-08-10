@@ -283,6 +283,55 @@ function startLocalVideoServer(): Promise<{ port: number; close: () => void }> {
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
+// ─── Admin: cache-bust ────────────────────────────────────────────────────────
+
+/**
+ * DELETE /api/video/cache
+ *
+ * Deletes the cached MP4 immediately so the next GET /api/video/render
+ * triggers a fresh headless render instead of waiting for the 24-hour TTL.
+ *
+ * Protected by the ADMIN_API_KEY environment variable.  The caller must
+ * supply the key in the Authorization header:
+ *
+ *   Authorization: Bearer <ADMIN_API_KEY>
+ *
+ * Returns:
+ *   204 – cache file was present and has been deleted.
+ *   401 – missing or wrong Authorization header.
+ *   404 – no cached file existed (nothing to delete).
+ */
+router.delete("/video/cache", (req: Request, res: Response) => {
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  const adminKey = process.env["ADMIN_API_KEY"];
+  const authHeader = req.headers["authorization"] ?? "";
+  const supplied = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length).trim()
+    : "";
+
+  if (!adminKey || supplied !== adminKey) {
+    res.status(401).json({ error: "Unauthorized — valid ADMIN_API_KEY required" });
+    return;
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+  if (!fs.existsSync(CACHE_FILE)) {
+    res.status(404).json({ error: "No cached video file found" });
+    return;
+  }
+
+  try {
+    fs.unlinkSync(CACHE_FILE);
+    logger.info({ CACHE_FILE }, "Video cache busted by admin");
+    res.status(204).end();
+  } catch (err) {
+    logger.error(err, "Failed to delete video cache file");
+    res.status(500).json({ error: "Failed to delete cache file", details: String(err) });
+  }
+});
+
+// ─── Route ────────────────────────────────────────────────────────────────────
+
 router.get("/video/render", async (req: Request, res: Response) => {
   // ── 0. Cache hit — serve immediately without rendering ───────────────────
   if (isCacheValid()) {
