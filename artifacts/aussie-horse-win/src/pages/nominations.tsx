@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil, Wifi, FlaskConical, ChevronDown, ChevronUp, PlayCircle, Share2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useVideoSeen } from '@/lib/useVideoSeen';
+export { getSeenVideos, markVideoSeen } from '@/lib/useVideoSeen';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -20,8 +22,6 @@ function formatRaceDate(dateStr: string): string {
   const d = new Date(year, month - 1, day);
   return `${DAYS[d.getDay()]} ${day} ${MONTHS[month - 1]}`;
 }
-
-const LEGACY_HOW_IT_WORKS_KEY = 'ahw_how_it_works_seen';
 
 const VIDEO_URL = import.meta.env.VITE_VIDEO_URL as string | undefined;
 
@@ -578,53 +578,3 @@ function TrophyIcon(props: any) {
   );
 }
 
-/**
- * Per-video seen-state helpers.
- *
- * Storage format: ahw_videos_seen → JSON array of video ID strings, e.g. ["how-it-works"]
- *
- * Migration: the old single-boolean key (ahw_how_it_works_seen === 'true') is read once
- * on first access and promoted into the new set so existing visitors don't see the banner
- * again after the upgrade.
- */
-const VIDEOS_SEEN_KEY = 'ahw_videos_seen';
-
-export function getSeenVideos(): Set<string> {
-  try {
-    const raw = localStorage.getItem(VIDEOS_SEEN_KEY);
-    const ids: string[] = raw ? JSON.parse(raw) : [];
-    const set = new Set<string>(ids);
-
-    // One-time migration: promote the old boolean flag
-    if (localStorage.getItem(LEGACY_HOW_IT_WORKS_KEY) === 'true') {
-      set.add('how-it-works');
-      localStorage.setItem(VIDEOS_SEEN_KEY, JSON.stringify([...set]));
-      localStorage.removeItem(LEGACY_HOW_IT_WORKS_KEY);
-    }
-
-    return set;
-  } catch {
-    return new Set();
-  }
-}
-
-function useVideoSeen(id: string): [boolean, () => void] {
-  const [seen, setSeen] = useState(() => getSeenVideos().has(id));
-
-  const markSeen = () => {
-    markVideoSeen(id);
-    setSeen(true);
-  };
-
-  return [seen, markSeen];
-}
-
-export function markVideoSeen(id: string): void {
-  try {
-    const set = getSeenVideos();
-    set.add(id);
-    localStorage.setItem(VIDEOS_SEEN_KEY, JSON.stringify([...set]));
-  } catch {
-    // ignore — localStorage may be unavailable (e.g. private browsing)
-  }
-}
