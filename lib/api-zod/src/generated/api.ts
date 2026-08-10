@@ -320,7 +320,8 @@ export const TriggerSyncResponse = zod.object({
   "nominationsGenerated": zod.number().int(),
   "nominationsRepriced": zod.number().int().default(triggerSyncResponseNominationsRepricedDefault).describe('Number of Pending nominations updated with fresh odds this sync'),
   "nominationsCancelled": zod.number().int().default(triggerSyncResponseNominationsCancelledDefault).describe('Number of Pending nominations cancelled because odds drifted outside the window'),
-  "message": zod.string()
+  "message": zod.string(),
+  "liveError": zod.string().optional().describe('Error message when both TAB and Ladbrokes failed and mock data was used as fallback')
 })
 
 
