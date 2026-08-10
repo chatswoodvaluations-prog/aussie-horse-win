@@ -1,44 +1,37 @@
 ---
 name: Oracle VPS deployment
-description: Oracle Cloud Sydney server details, key decisions, and data source findings
+description: Oracle Cloud Sydney server facts, deployment process, and known gotchas
 ---
 
 ## Server
-- IP: 149.118.66.37
-- OS: Ubuntu, user: ubuntu
-- SSH key: "ssh-key-2026-08-09 (2).key" in Oracle Cloud Shell home (~/)
-- Oracle console URL: https://console.ap-sydney-1.oraclecloud.com/
-- Cloud Shell user: chatswoodv@cloudshell (tenancy: chatswoodvaluations)
+- IP: 149.118.66.37, user: ubuntu, hostname: aussie-horse-win
+- SSH key: "ssh-key-2026-08-09 (2).key" — only available in Oracle Cloud Shell (browser-based terminal at cloud.oracle.com)
+- When the user is at prompt `ubuntu@aussie-horse-win:~$`, they ARE already on the Oracle machine — no SSH needed
 
-## GitHub
-- Account: chatswoodvaluations-prog
-- Repo: aussie-horse-win (public)
+## Deploy command
+```bash
+cd ~/aussie-horse-win && git pull && bash deploy/fix-pm2.sh
+```
+fix-pm2.sh stops PM2 before the Vite build (prevents OOM on 1GB RAM), then restarts.
 
-## PM2
-- Process name: ahw-api
-- Config file: ~/aussie-horse-win/ecosystem.config.cjs
-- Must include PORT, DATABASE_URL, SESSION_SECRET
-- Fix/update script: deploy/fix-pm2.sh (rebuilds API + frontend then restarts PM2)
+## Live data
+- TAB (api.tab.com.au): DNS ENOTFOUND from datacenter IPs — always fails, skip TAB
+- Ladbrokes (api.ladbrokes.com.au): works from Oracle AU IP, HTTP 500 from Replit (geo-blocked)
+- Replit dev server will ALWAYS show source: mock — Oracle is the only path to live data
+- Sync order: TAB (5s timeout, fails fast) → Ladbrokes → mock fallback
 
-## Data source resolution — critical finding
-- TAB API (api.tab.com.au): BLOCKED from Oracle Cloud IPs — HTTP 000 (connection refused)
-- Ladbrokes API (api.ladbrokes.com.au): WORKS from Oracle AU IP — returns real race cards
-- Solution: sync engine tries TAB → Ladbrokes → mock (in order)
-- Ladbrokes provides: real tracks, real horse names, real win/place odds
-- Confirmed working: Port Macquarie, Ascot, Mildura, Cairns, Mackay, Newcastle etc.
+## Sync performance fixes (applied Aug 2026)
+- Removed NordVPN SOCKS5 proxy from both tabFetcher.ts and ladbrokesFetcher.ts — proxy caused socket-level hangs that defeated AbortController
+- Selection engine rewritten: 3 batch queries (was N+1 per race/runner) + parallel write flush
+- TAB timeout: 5s (was 15s); Ladbrokes timeout: 10s; odds budget: 15s (was 30s)
+- Sync now completes in ~5–15s on Oracle (was timing out after 120s)
 
-**Why:** TAB API uses Akamai geo-restriction that blocks known datacenter IP ranges even
-in AU. Ladbrokes AU API is accessible from Oracle's Sydney datacenter IP.
+## Ladbrokes API
+- Endpoint: GET https://api.ladbrokes.com.au/v2/racing/racing-overview?date=YYYY-MM-DD&type=R
+- HTTP 500 for dates not yet published (fields posted ~7am AEST); skip those dates
+- fillEventCards now fetches event cards in parallel (was sequential)
 
-**How to apply:** No NordVPN needed. Ladbrokes fallback is automatic in sync.ts.
-The sync logs will show "source: ladbrokes" on success.
-
-## Frontend rebuild
-- fix-pm2.sh now rebuilds BOTH API and frontend
-- Frontend built with VITE_VIDEO_URL="" (hides video banner) and BASE_PATH="/"
-- Video artifact only exists on Replit, not Oracle — hiding it is correct behaviour
-
-## Firewall
-- Oracle has a hidden iptables firewall beyond the VCN security list
-- setup.sh uses UFW which persists correctly
-- Port 80 open via UFW (allow 80/tcp)
+## Frontend
+- nginx serves static Vite build from /var/www/html (or similar)
+- git pull + pm2 restart only updates the Node API; frontend needs fix-pm2.sh rebuild to update
+- After rebuild: Guide tab, stat card fix, video banner removal all visible

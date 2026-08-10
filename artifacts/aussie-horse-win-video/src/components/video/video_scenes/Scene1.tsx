@@ -46,7 +46,7 @@ export function Scene1() {
           transition={{ delay: 1 }}
           className="text-[#00ff41]"
         >
-          [OK] Connected to TAB &amp; Betfair feeds
+          [OK] Connected to Ladbrokes fixed-odds feed
         </motion.div>
 
         <motion.div
