@@ -19,6 +19,155 @@ export interface Settings {
   enabledTrackIds: number[];
 }
 
+// ── Injectable DB adapter ─────────────────────────────────────────────────────
+//
+// SelectionEngineDb abstracts every database operation performed by
+// runSelectionEngine.  The production Drizzle implementation is created
+// internally via makeDrizzleSelectionEngineDb().  Tests may supply their own
+// in-memory implementation without touching the real database.
+
+export interface EngineTrack {
+  id: number;
+}
+
+export interface EngineRace {
+  id: number;
+  trackId: number;
+  trackName: string;
+  state: string;
+  raceNumber: number;
+  raceName: string | null;
+  raceDate: string;
+  raceTime: string | null;
+  fieldSize: number;
+}
+
+export interface EngineRunner {
+  id: number;
+  horseName: string;
+  barrierNumber: number;
+  speedMapPosition: string;
+  winOdds: number;
+  placeOdds: number;
+  jockey: string | null;
+  trainer: string | null;
+  ladbrokesWinOdds?: number | null;
+  ladbrokesPlaceOdds?: number | null;
+}
+
+export interface EngineNomination {
+  id: number;
+  status: string;
+  winStake: number;
+  placeStake: number;
+}
+
+export interface InsertNominationData {
+  raceId: number;
+  runnerId: number;
+  trackName: string;
+  state: string;
+  raceNumber: number;
+  raceName: string | null;
+  raceDate: string;
+  raceTime: string | null;
+  horseName: string;
+  barrierNumber: number;
+  speedMapPosition: string;
+  winOdds: number;
+  placeOdds: number;
+  ladbrokesWinOdds?: number | null;
+  ladbrokesPlaceOdds?: number | null;
+  winStake: number;
+  placeStake: number;
+  totalOutlay: number;
+  projectedWinReturn: number;
+  projectedPlaceReturn: number;
+  jockey: string | null;
+  trainer: string | null;
+  status: string;
+}
+
+export interface SelectionEngineDb {
+  /** Returns current settings (never throws; returns defaults when no row exists). */
+  getSettings(): Promise<Settings>;
+  /** Returns all tracks whose `enabled` flag is true. */
+  getEnabledTracks(): Promise<EngineTrack[]>;
+  /** Returns every race row (caller filters by trackId). */
+  getAllRaces(): Promise<EngineRace[]>;
+  /** Returns all runners for a given race. */
+  getRunnersForRace(raceId: number): Promise<EngineRunner[]>;
+  /** Persists the filter-evaluation result back to the runner row. */
+  updateRunner(id: number, data: { passed: boolean; filterResults: string }): Promise<void>;
+  /** Returns all nominations for a given runner (any status). */
+  getNominationsForRunner(runnerId: number): Promise<EngineNomination[]>;
+  /** Reprices a Pending nomination with fresh odds and derived projections. */
+  updateNomination(
+    id: number,
+    data: {
+      winOdds: number;
+      placeOdds: number;
+      projectedWinReturn: number;
+      projectedPlaceReturn: number;
+    }
+  ): Promise<void>;
+  /** Inserts a brand-new nomination for a qualifying runner. */
+  insertNomination(data: InsertNominationData): Promise<void>;
+}
+
+// ── Drizzle (production) implementation ──────────────────────────────────────
+
+function makeDrizzleSelectionEngineDb(): SelectionEngineDb {
+  return {
+    async getSettings() {
+      return getSettings();
+    },
+
+    async getEnabledTracks() {
+      const rows = await db
+        .select({ id: tracksTable.id })
+        .from(tracksTable)
+        .where(eq(tracksTable.enabled, true));
+      return rows;
+    },
+
+    async getAllRaces() {
+      return db.select().from(racesTable);
+    },
+
+    async getRunnersForRace(raceId) {
+      return db.select().from(runnersTable).where(eq(runnersTable.raceId, raceId));
+    },
+
+    async updateRunner(id, data) {
+      await db.update(runnersTable).set(data).where(eq(runnersTable.id, id));
+    },
+
+    async getNominationsForRunner(runnerId) {
+      const rows = await db
+        .select()
+        .from(nominationsTable)
+        .where(eq(nominationsTable.runnerId, runnerId));
+      return rows.map((r) => ({
+        id: r.id,
+        status: r.status,
+        winStake: r.winStake,
+        placeStake: r.placeStake,
+      }));
+    },
+
+    async updateNomination(id, data) {
+      await db.update(nominationsTable).set(data).where(eq(nominationsTable.id, id));
+    },
+
+    async insertNomination(data) {
+      await db.insert(nominationsTable).values(data);
+    },
+  };
+}
+
+// ── Standalone getSettings (used directly by settings routes etc.) ────────────
+
 export async function getSettings(): Promise<Settings> {
   const rows = await db.select().from(settingsTable).limit(1);
   if (rows.length === 0) {
@@ -118,18 +267,23 @@ export function evaluateRunner(
   return { passed, filterResults: results };
 }
 
-export async function runSelectionEngine(): Promise<{
+export async function runSelectionEngine(
+  engineDb?: SelectionEngineDb
+): Promise<{
   racesFound: number;
   racesAdded: number;
   runnersAdded: number;
   nominationsGenerated: number;
   nominationsRepriced: number;
 }> {
-  const settings = await getSettings();
+  const edb = engineDb ?? makeDrizzleSelectionEngineDb();
+
+  const settings = await edb.getSettings();
   const enabledTrackIds = settings.enabledTrackIds;
 
-  // Get enabled tracks
-  let tracks = await db.select().from(tracksTable).where(eq(tracksTable.enabled, true));
+  // Get enabled tracks (rows with enabled = true), then narrow to the
+  // explicitly allowed set when the settings list is non-empty.
+  let tracks = await edb.getEnabledTracks();
   if (enabledTrackIds.length > 0) {
     tracks = tracks.filter((t) => enabledTrackIds.includes(t.id));
   }
@@ -137,36 +291,29 @@ export async function runSelectionEngine(): Promise<{
   const trackIds = tracks.map((t) => t.id);
 
   // Get all upcoming races for enabled tracks
-  const allRaces = await db.select().from(racesTable);
+  const allRaces = await edb.getAllRaces();
   const races = allRaces.filter((r) => trackIds.includes(r.trackId));
 
   let nominationsGenerated = 0;
   let nominationsRepriced = 0;
 
   for (const race of races) {
-    const runners = await db.select().from(runnersTable).where(eq(runnersTable.raceId, race.id));
+    const runners = await edb.getRunnersForRace(race.id);
 
     for (const runner of runners) {
       const { passed, filterResults } = evaluateRunner(runner, race, settings);
 
       // Update runner with latest filter evaluation
-      await db
-        .update(runnersTable)
-        .set({
-          passed,
-          filterResults: JSON.stringify(filterResults),
-        })
-        .where(eq(runnersTable.id, runner.id));
+      await edb.updateRunner(runner.id, {
+        passed,
+        filterResults: JSON.stringify(filterResults),
+      });
 
       // Always fetch existing nominations for this runner so we can reprice
       // Pending ones regardless of whether the runner currently passes filters.
       // Repricing must happen even when odds drift outside the selection window —
       // the displayed figures must always reflect the current market price.
-      const existing = await db
-        .select()
-        .from(nominationsTable)
-        .where(eq(nominationsTable.runnerId, runner.id));
-
+      const existing = await edb.getNominationsForRunner(runner.id);
       const pendingNoms = existing.filter((n) => n.status === "Pending");
 
       if (pendingNoms.length > 0) {
@@ -178,15 +325,12 @@ export async function runSelectionEngine(): Promise<{
           const projectedWinReturn = nom.winStake * runner.winOdds + nom.placeStake * runner.placeOdds;
           const projectedPlaceReturn = nom.placeStake * runner.placeOdds;
 
-          await db
-            .update(nominationsTable)
-            .set({
-              winOdds: runner.winOdds,
-              placeOdds: runner.placeOdds,
-              projectedWinReturn,
-              projectedPlaceReturn,
-            })
-            .where(eq(nominationsTable.id, nom.id));
+          await edb.updateNomination(nom.id, {
+            winOdds: runner.winOdds,
+            placeOdds: runner.placeOdds,
+            projectedWinReturn,
+            projectedPlaceReturn,
+          });
 
           nominationsRepriced++;
         }
@@ -195,7 +339,7 @@ export async function runSelectionEngine(): Promise<{
         const projectedWinReturn = settings.winStake * runner.winOdds + settings.placeStake * runner.placeOdds;
         const projectedPlaceReturn = settings.placeStake * runner.placeOdds;
 
-        await db.insert(nominationsTable).values({
+        await edb.insertNomination({
           raceId: race.id,
           runnerId: runner.id,
           trackName: race.trackName,

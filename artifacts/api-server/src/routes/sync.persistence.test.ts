@@ -26,6 +26,7 @@
 import { describe, it, mock, before } from "node:test";
 import assert from "node:assert/strict";
 import { upsertRaceRunners, type RunnerUpsertDb } from "../lib/raceUpsert.js";
+import { runSelectionEngine, type SelectionEngineDb } from "../lib/selectionEngine.js";
 
 // ── In-memory store ──────────────────────────────────────────────────────────
 
@@ -494,6 +495,247 @@ describe("upsert contract — runner ID preservation and scratching rules (produ
       remainingNoms.length,
       0,
       "Pending nomination for scratched runner must be cleaned up before row is removed"
+    );
+  });
+});
+
+// ── Track toggle tests ────────────────────────────────────────────────────────
+//
+// Verifies that enabling/disabling a track in settings correctly filters that
+// track's races out of (or back into) the nomination engine on the next sync.
+//
+// Each test is fully independent: it creates its own fresh in-memory tables,
+// seeds state, builds a SelectionEngineDb adapter, and calls the REAL
+// runSelectionEngine from selectionEngine.ts.  No state bleeds between tests.
+
+/**
+ * Build a SelectionEngineDb adapter backed by independent in-memory Tables.
+ * Implements the same interface the production Drizzle adapter satisfies so the
+ * real runSelectionEngine code path runs in full — not a re-implementation.
+ */
+function makeToggleTestDb(
+  tTracks:      Table<TrackRow>,
+  tRaces:       Table<RaceRow>,
+  tRunners:     Table<RunnerRow>,
+  tNominations: Table<NominationRow>,
+  tSettings:    Table<SettingsRow>
+): SelectionEngineDb {
+  return {
+    async getSettings() {
+      const rows = tSettings.select();
+      if (rows.length === 0) {
+        return {
+          fieldSizeMin: 8, fieldSizeMax: 11,
+          minWinOdds: 5.0, maxWinOdds: 10.0, minPlaceOdds: 1.85,
+          winStake: 5.0, placeStake: 20.0, enabledTrackIds: [],
+        };
+      }
+      const s = rows[0];
+      return {
+        fieldSizeMin: s.fieldSizeMin,
+        fieldSizeMax: s.fieldSizeMax,
+        minWinOdds: s.minWinOdds,
+        maxWinOdds: s.maxWinOdds,
+        minPlaceOdds: s.minPlaceOdds,
+        winStake: s.winStake,
+        placeStake: s.placeStake,
+        enabledTrackIds: JSON.parse(s.enabledTrackIds) as number[],
+      };
+    },
+
+    async getEnabledTracks() {
+      return tTracks.select((t) => t.enabled).map((t) => ({ id: t.id }));
+    },
+
+    async getAllRaces() {
+      return tRaces.select().map((r) => ({
+        id: r.id, trackId: r.trackId, trackName: r.trackName,
+        state: r.state, raceNumber: r.raceNumber, raceName: r.raceName,
+        raceDate: r.raceDate, raceTime: r.raceTime, fieldSize: r.fieldSize,
+      }));
+    },
+
+    async getRunnersForRace(raceId) {
+      return tRunners.select((r) => r.raceId === raceId).map((r) => ({
+        id: r.id, horseName: r.horseName, barrierNumber: r.barrierNumber,
+        speedMapPosition: r.speedMapPosition, winOdds: r.winOdds,
+        placeOdds: r.placeOdds, jockey: r.jockey, trainer: r.trainer,
+        ladbrokesWinOdds: null, ladbrokesPlaceOdds: null,
+      }));
+    },
+
+    async updateRunner(id, data) {
+      tRunners.update((r) => r.id === id, data as Partial<RunnerRow>);
+    },
+
+    async getNominationsForRunner(runnerId) {
+      return tNominations.select((n) => n.runnerId === runnerId).map((n) => ({
+        id: n.id, status: n.status, winStake: n.winStake, placeStake: n.placeStake,
+      }));
+    },
+
+    async updateNomination(id, data) {
+      tNominations.update((n) => n.id === id, data as Partial<NominationRow>);
+    },
+
+    async insertNomination(data) {
+      // Normalize nullable DB fields to empty strings for the in-memory store,
+      // which uses non-nullable NominationRow.  Tests don't assert these values.
+      tNominations.insert({
+        raceId: data.raceId, runnerId: data.runnerId,
+        trackName: data.trackName, state: data.state,
+        raceNumber: data.raceNumber, raceName: data.raceName ?? "",
+        raceDate: data.raceDate, raceTime: data.raceTime ?? "",
+        horseName: data.horseName, barrierNumber: data.barrierNumber,
+        speedMapPosition: data.speedMapPosition,
+        winOdds: data.winOdds, placeOdds: data.placeOdds,
+        winStake: data.winStake, placeStake: data.placeStake,
+        totalOutlay: data.totalOutlay,
+        projectedWinReturn: data.projectedWinReturn,
+        projectedPlaceReturn: data.projectedPlaceReturn,
+        jockey: data.jockey ?? "", trainer: data.trainer ?? "", status: data.status,
+      });
+    },
+  };
+}
+
+/** Seed a qualifying runner: passes all five filter rules out of the box. */
+function seedQualifyingRunner(
+  tRaces: Table<RaceRow>,
+  tRunners: Table<RunnerRow>,
+  trackId: number,
+  trackName: string,
+  state: string,
+  horseName: string
+): { raceId: number; runnerId: number } {
+  // fieldSize=8 (8–11 ✓), winOdds=6.0 (5–10 ✓), placeOdds=2.1 (≥1.85 ✓),
+  // speedMapPosition=Lead ✓, barrierNumber=2 (≤5) ✓
+  const race = tRaces.insert({
+    trackId, trackName, state,
+    raceNumber: 1, raceName: "Race 1",
+    raceDate: "2026-08-09", raceTime: "13:00",
+    fieldSize: 8, distance: 1200,
+  });
+  const runner = tRunners.insert({
+    raceId: race.id, horseName, barrierNumber: 2,
+    speedMapPosition: "Lead", winOdds: 6.0, placeOdds: 2.1,
+    jockey: "J. McDonald", trainer: "C. Waller",
+    passed: false, filterResults: "[]",
+  });
+  return { raceId: race.id, runnerId: runner.id };
+}
+
+describe("track toggle — real selection engine respects enabledTrackIds on each sync", () => {
+
+  it("disabled track produces zero nominations; enabled track produces nominations — same sync", async () => {
+    // Fresh independent tables for this test.
+    const tTracks      = new Table<TrackRow>();
+    const tRaces       = new Table<RaceRow>();
+    const tRunners     = new Table<RunnerRow>();
+    const tNominations = new Table<NominationRow>();
+    const tSettings    = new Table<SettingsRow>();
+
+    // Track A — row enabled, but absent from enabledTrackIds (toggled OFF in UI).
+    const trackA = tTracks.insert({ name: "Off Track", state: "VIC", type: "Regional", enabled: true });
+    // Track B — row enabled AND present in enabledTrackIds (toggled ON in UI).
+    const trackB = tTracks.insert({ name: "On Track", state: "NSW", type: "Metro", enabled: true });
+
+    const { raceId: raceAId } = seedQualifyingRunner(tRaces, tRunners, trackA.id, "Off Track", "VIC", "Off Horse");
+    const { raceId: raceBId } = seedQualifyingRunner(tRaces, tRunners, trackB.id, "On Track", "NSW", "On Horse");
+
+    // Settings: only track B enabled.
+    tSettings.insert({
+      fieldSizeMin: 8, fieldSizeMax: 11, minWinOdds: 5.0, maxWinOdds: 10.0,
+      minPlaceOdds: 1.85, winStake: 5, placeStake: 20,
+      enabledTrackIds: JSON.stringify([trackB.id]),
+    });
+
+    await runSelectionEngine(makeToggleTestDb(tTracks, tRaces, tRunners, tNominations, tSettings));
+
+    const nomsA = tNominations.select((n) => n.raceId === raceAId);
+    assert.equal(nomsA.length, 0, "disabled track must produce zero nominations");
+
+    const nomsB = tNominations.select((n) => n.raceId === raceBId);
+    assert.ok(nomsB.length > 0, "enabled track must produce at least one nomination");
+    assert.equal(nomsB[0].horseName, "On Horse");
+    assert.equal(nomsB[0].status, "Pending");
+  });
+
+  it("re-enabling a disabled track produces nominations on the next sync", async () => {
+    const tTracks      = new Table<TrackRow>();
+    const tRaces       = new Table<RaceRow>();
+    const tRunners     = new Table<RunnerRow>();
+    const tNominations = new Table<NominationRow>();
+    const tSettings    = new Table<SettingsRow>();
+
+    const track = tTracks.insert({ name: "Toggle Track", state: "VIC", type: "Regional", enabled: true });
+    const { raceId } = seedQualifyingRunner(tRaces, tRunners, track.id, "Toggle Track", "VIC", "Toggle Horse");
+
+    // First sync: track is disabled (absent from enabledTrackIds).
+    const settingsRow = tSettings.insert({
+      fieldSizeMin: 8, fieldSizeMax: 11, minWinOdds: 5.0, maxWinOdds: 10.0,
+      minPlaceOdds: 1.85, winStake: 5, placeStake: 20,
+      enabledTrackIds: JSON.stringify([]),  // empty list = all tracks enabled (engine default)
+                                            // so we need a second track to test the filter
+      // Instead: explicitly exclude the track by using an arbitrary other ID
+    });
+    // Override: use a non-existent track ID so our track is excluded.
+    tSettings.update((s) => s.id === settingsRow.id, { enabledTrackIds: JSON.stringify([9999]) });
+
+    const edb = makeToggleTestDb(tTracks, tRaces, tRunners, tNominations, tSettings);
+
+    await runSelectionEngine(edb);
+    assert.equal(
+      tNominations.select((n) => n.raceId === raceId).length,
+      0,
+      "track absent from enabledTrackIds must produce zero nominations on first sync"
+    );
+
+    // Second sync: enable the track by adding it to enabledTrackIds.
+    tSettings.update((s) => s.id === settingsRow.id, { enabledTrackIds: JSON.stringify([track.id]) });
+
+    await runSelectionEngine(edb);
+
+    const noms = tNominations.select((n) => n.raceId === raceId);
+    assert.ok(noms.length > 0, "re-enabled track must produce nominations on the next sync");
+    assert.equal(noms[0].horseName, "Toggle Horse");
+    assert.equal(noms[0].status, "Pending");
+  });
+
+  it("disabling a previously-enabled track stops new nominations on the subsequent sync", async () => {
+    const tTracks      = new Table<TrackRow>();
+    const tRaces       = new Table<RaceRow>();
+    const tRunners     = new Table<RunnerRow>();
+    const tNominations = new Table<NominationRow>();
+    const tSettings    = new Table<SettingsRow>();
+
+    const track = tTracks.insert({ name: "Then Off Track", state: "QLD", type: "Regional", enabled: true });
+    const { raceId } = seedQualifyingRunner(tRaces, tRunners, track.id, "Then Off Track", "QLD", "Then Off Horse");
+
+    const settingsRow = tSettings.insert({
+      fieldSizeMin: 8, fieldSizeMax: 11, minWinOdds: 5.0, maxWinOdds: 10.0,
+      minPlaceOdds: 1.85, winStake: 5, placeStake: 20,
+      enabledTrackIds: JSON.stringify([track.id]),  // track starts ENABLED
+    });
+
+    const edb = makeToggleTestDb(tTracks, tRaces, tRunners, tNominations, tSettings);
+
+    // First sync: track is enabled — nominations must be created.
+    await runSelectionEngine(edb);
+    const nomsAfterFirstSync = tNominations.select((n) => n.raceId === raceId);
+    assert.ok(nomsAfterFirstSync.length > 0, "enabled track must produce nominations on first sync");
+
+    // Remove nominations so the second sync starts with a clean slate, then disable the track.
+    tNominations.delete((n) => n.raceId === raceId);
+    tSettings.update((s) => s.id === settingsRow.id, { enabledTrackIds: JSON.stringify([9999]) });
+
+    // Second sync: track is disabled — zero new nominations.
+    await runSelectionEngine(edb);
+    const nomsAfterSecondSync = tNominations.select((n) => n.raceId === raceId);
+    assert.equal(
+      nomsAfterSecondSync.length,
+      0,
+      "disabled track must produce zero nominations on the next sync"
     );
   });
 });
