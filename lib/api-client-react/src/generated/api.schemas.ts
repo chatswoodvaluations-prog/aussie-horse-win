@@ -70,6 +70,18 @@ export interface Runner {
   filterResults: FilterResult[];
 }
 
+/**
+ * Whether odds came from the live TAB feed ("live") or the mock generator ("mock")
+ * @nullable
+ */
+export type NominationDataSource = typeof NominationDataSource[keyof typeof NominationDataSource] | null;
+
+
+export const NominationDataSource = {
+  live: 'live',
+  mock: 'mock',
+} as const;
+
 export interface Race {
   id: number;
   trackName: string;
@@ -85,8 +97,7 @@ export interface Race {
   distance?: number | null;
   runners: Runner[];
   qualifiedCount: number;
-  /** @nullable */
-  dataSource?: NominationDataSource;
+  dataSource?: NominationDataSource | null;
 }
 
 export type NominationStatus = typeof NominationStatus[keyof typeof NominationStatus];
@@ -103,10 +114,10 @@ export const NominationStatus = {
  * Whether odds came from the live TAB feed ("live") or the mock generator ("mock")
  * @nullable
  */
-export type NominationDataSource = typeof NominationDataSource[keyof typeof NominationDataSource] | null;
+export type NominationDataSourceProperty = typeof NominationDataSourceProperty[keyof typeof NominationDataSourceProperty] | null;
 
 
-export const NominationDataSource = {
+export const NominationDataSourceProperty = {
   live: 'live',
   mock: 'mock',
 } as const;
@@ -152,7 +163,22 @@ export interface Nomination {
      * Whether odds came from the live TAB feed ("live") or the mock generator ("mock")
      * @nullable
      */
-  dataSource?: NominationDataSource;
+  dataSource?: NominationDataSourceProperty;
+  /**
+     * Actual net profit/loss for settled nominations (actualWinReturn + actualPlaceReturn - totalOutlay); null for Pending
+     * @nullable
+     */
+  netResult?: number | null;
+  /**
+     * Actual win return received at settlement; null for Pending or when no win dividend was paid
+     * @nullable
+     */
+  actualWinReturn?: number | null;
+  /**
+     * Actual place return received at settlement; null for Pending or when no place dividend was paid
+     * @nullable
+     */
+  actualPlaceReturn?: number | null;
 }
 
 export type NominationSummaryByTrackItem = {

@@ -5,7 +5,7 @@
  * Aussie Horse Win API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { NominationDataSource } from './nominationDataSource';
+import type { NominationDataSourceProperty } from './nominationDataSourceProperty';
 import type { NominationStatus } from './nominationStatus';
 
 export interface Nomination {
@@ -49,5 +49,20 @@ export interface Nomination {
      * Whether odds came from the live TAB feed ("live") or the mock generator ("mock")
      * @nullable
      */
-  dataSource?: NominationDataSource;
+  dataSource?: NominationDataSourceProperty;
+  /**
+     * Actual net profit/loss for settled nominations (actualWinReturn + actualPlaceReturn - totalOutlay); null for Pending
+     * @nullable
+     */
+  netResult?: number | null;
+  /**
+     * Actual win return received at settlement; null for Pending or when no win dividend was paid
+     * @nullable
+     */
+  actualWinReturn?: number | null;
+  /**
+     * Actual place return received at settlement; null for Pending or when no place dividend was paid
+     * @nullable
+     */
+  actualPlaceReturn?: number | null;
 }

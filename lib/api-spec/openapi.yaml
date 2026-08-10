@@ -316,6 +316,11 @@ components:
         - passed
         - message
 
+    NominationDataSource:
+      type: ["string", "null"]
+      enum: [live, mock, null]
+      description: Whether odds came from the live TAB feed ("live") or the mock generator ("mock")
+
     Race:
       type: object
       properties:
@@ -413,6 +418,15 @@ components:
           type: ["string", "null"]
           enum: [live, mock, null]
           description: Whether odds came from the live TAB feed ("live") or the mock generator ("mock")
+        netResult:
+          type: ["number", "null"]
+          description: Actual net profit/loss for settled nominations (actualWinReturn + actualPlaceReturn - totalOutlay); null for Pending
+        actualWinReturn:
+          type: ["number", "null"]
+          description: Actual win return received at settlement; null for Pending or when no win dividend was paid
+        actualPlaceReturn:
+          type: ["number", "null"]
+          description: Actual place return received at settlement; null for Pending or when no place dividend was paid
       required:
         - id
         - raceId

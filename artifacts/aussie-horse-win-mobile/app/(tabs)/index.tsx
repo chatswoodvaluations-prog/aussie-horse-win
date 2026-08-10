@@ -78,7 +78,11 @@ function shareNomination(item: Nomination) {
 function NominationCard({ item }: { item: Nomination }) {
   const colors = useColors();
   const isPending = item.status === 'Pending';
-  const net = item.status === 'Won'
+  // Use the actual net result from bet_results for settled nominations;
+  // fall back to a projection-based estimate only when actual data is missing.
+  const net = item.netResult != null
+    ? item.netResult
+    : item.status === 'Won'
     ? item.projectedWinReturn - item.totalOutlay
     : item.status === 'Placed'
     ? item.projectedPlaceReturn - item.totalOutlay

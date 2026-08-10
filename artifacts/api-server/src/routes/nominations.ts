@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, nominationsTable, racesTable } from "@workspace/db";
+import { db, nominationsTable, racesTable, betResultsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { GetNominationsResponse, GetNominationsSummaryResponse } from "@workspace/api-zod";
 
@@ -10,9 +10,10 @@ router.get("/nominations", async (req, res): Promise<void> => {
     .select()
     .from(nominationsTable)
     .leftJoin(racesTable, eq(nominationsTable.raceId, racesTable.id))
+    .leftJoin(betResultsTable, eq(betResultsTable.nominationId, nominationsTable.id))
     .orderBy(nominationsTable.raceDate, nominationsTable.raceNumber);
 
-  res.json(GetNominationsResponse.parse(rows.map(({ nominations, races }) => ({
+  res.json(GetNominationsResponse.parse(rows.map(({ nominations, races, bet_results }) => ({
     id: nominations.id,
     raceId: nominations.raceId,
     runnerId: nominations.runnerId,
@@ -38,6 +39,9 @@ router.get("/nominations", async (req, res): Promise<void> => {
     trainer: nominations.trainer ?? null,
     status: nominations.status as "Pending" | "Won" | "Placed" | "Unplaced",
     dataSource: races?.dataSource ?? null,
+    netResult: bet_results?.netResult ?? null,
+    actualWinReturn: bet_results?.actualWinReturn ?? null,
+    actualPlaceReturn: bet_results?.actualPlaceReturn ?? null,
   }))));
 });
 
