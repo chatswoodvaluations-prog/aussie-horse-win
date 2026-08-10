@@ -1,5 +1,5 @@
 import { db, tracksTable, racesTable, runnersTable, nominationsTable, settingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { logger } from "./logger";
 
 export interface FilterResult {
@@ -281,65 +281,79 @@ export async function runSelectionEngine(
   const settings = await edb.getSettings();
   const enabledTrackIds = settings.enabledTrackIds;
 
-  // Get enabled tracks (rows with enabled = true), then narrow to the
-  // explicitly allowed set when the settings list is non-empty.
   let tracks = await edb.getEnabledTracks();
   if (enabledTrackIds.length > 0) {
     tracks = tracks.filter((t) => enabledTrackIds.includes(t.id));
   }
 
-  const trackIds = tracks.map((t) => t.id);
-
-  // Get all upcoming races for enabled tracks
+  const trackIdSet = new Set(tracks.map((t) => t.id));
   const allRaces = await edb.getAllRaces();
-  const races = allRaces.filter((r) => trackIds.includes(r.trackId));
+  const races = allRaces.filter((r) => trackIdSet.has(r.trackId));
+
+  if (races.length === 0) {
+    return { racesFound: 0, racesAdded: 0, runnersAdded: 0, nominationsGenerated: 0, nominationsRepriced: 0 };
+  }
+
+  // ── Batch-load ALL runners and nominations in two queries (avoid N+1) ────────
+  const raceIdSet = new Set(races.map((r) => r.id));
+
+  const [allRunners, allNominations] = await Promise.all([
+    db.select().from(runnersTable).where(inArray(runnersTable.raceId, [...raceIdSet])),
+    db.select({
+      id: nominationsTable.id,
+      runnerId: nominationsTable.runnerId,
+      status: nominationsTable.status,
+      winStake: nominationsTable.winStake,
+      placeStake: nominationsTable.placeStake,
+    }).from(nominationsTable).where(inArray(nominationsTable.raceId, [...raceIdSet])),
+  ]);
+
+  // Index for fast lookup
+  const runnersByRace = new Map<number, typeof allRunners>();
+  for (const runner of allRunners) {
+    if (!runnersByRace.has(runner.raceId)) runnersByRace.set(runner.raceId, []);
+    runnersByRace.get(runner.raceId)!.push(runner);
+  }
+
+  const nomsByRunner = new Map<number, typeof allNominations>();
+  for (const nom of allNominations) {
+    if (!nomsByRunner.has(nom.runnerId)) nomsByRunner.set(nom.runnerId, []);
+    nomsByRunner.get(nom.runnerId)!.push(nom);
+  }
+
+  // ── Collect all writes, then flush in parallel ────────────────────────────────
+  const runnerUpdates: Array<{ id: number; data: Parameters<typeof edb.updateRunner>[1] }> = [];
+  const nominationUpdates: Array<{ id: number; data: Parameters<typeof edb.updateNomination>[1] }> = [];
+  const nominationInserts: Array<Parameters<typeof edb.insertNomination>[0]> = [];
 
   let nominationsGenerated = 0;
   let nominationsRepriced = 0;
 
   for (const race of races) {
-    const runners = await edb.getRunnersForRace(race.id);
+    const runners = runnersByRace.get(race.id) ?? [];
 
     for (const runner of runners) {
       const { passed, filterResults } = evaluateRunner(runner, race, settings);
 
-      // Update runner with latest filter evaluation
-      await edb.updateRunner(runner.id, {
-        passed,
-        filterResults: JSON.stringify(filterResults),
-      });
+      runnerUpdates.push({ id: runner.id, data: { passed, filterResults: JSON.stringify(filterResults) } });
 
-      // Always fetch existing nominations for this runner so we can reprice
-      // Pending ones regardless of whether the runner currently passes filters.
-      // Repricing must happen even when odds drift outside the selection window —
-      // the displayed figures must always reflect the current market price.
-      const existing = await edb.getNominationsForRunner(runner.id);
+      const existing = nomsByRunner.get(runner.id) ?? [];
       const pendingNoms = existing.filter((n) => n.status === "Pending");
 
       if (pendingNoms.length > 0) {
-        // Reprice every Pending nomination using the fresh runner odds.
-        // Each nomination's stored winStake/placeStake is preserved — only
-        // the odds snapshot and derived projections are updated.
-        // Won/Placed/Unplaced records are immutable.
         for (const nom of pendingNoms) {
           const projectedWinReturn = nom.winStake * runner.winOdds + nom.placeStake * runner.placeOdds;
           const projectedPlaceReturn = nom.placeStake * runner.placeOdds;
-
-          await edb.updateNomination(nom.id, {
-            winOdds: runner.winOdds,
-            placeOdds: runner.placeOdds,
-            projectedWinReturn,
-            projectedPlaceReturn,
+          nominationUpdates.push({
+            id: nom.id,
+            data: { winOdds: runner.winOdds, placeOdds: runner.placeOdds, projectedWinReturn, projectedPlaceReturn },
           });
-
           nominationsRepriced++;
         }
       } else if (passed && existing.length === 0) {
-        // No nomination yet and runner passes all filters — create one.
         const projectedWinReturn = settings.winStake * runner.winOdds + settings.placeStake * runner.placeOdds;
         const projectedPlaceReturn = settings.placeStake * runner.placeOdds;
-
-        await edb.insertNomination({
+        nominationInserts.push({
           raceId: race.id,
           runnerId: runner.id,
           trackName: race.trackName,
@@ -364,19 +378,19 @@ export async function runSelectionEngine(
           trainer: runner.trainer,
           status: "Pending",
         });
-
         nominationsGenerated++;
       }
     }
   }
 
+  // Flush all writes in parallel (runner updates + nomination updates + inserts)
+  await Promise.all([
+    ...runnerUpdates.map(({ id, data }) => edb.updateRunner(id, data)),
+    ...nominationUpdates.map(({ id, data }) => edb.updateNomination(id, data)),
+    ...nominationInserts.map((data) => edb.insertNomination(data)),
+  ]);
+
   logger.info({ nominationsGenerated, nominationsRepriced }, "Selection engine run complete");
 
-  return {
-    racesFound: races.length,
-    racesAdded: 0,
-    runnersAdded: 0,
-    nominationsGenerated,
-    nominationsRepriced,
-  };
+  return { racesFound: races.length, racesAdded: 0, runnersAdded: 0, nominationsGenerated, nominationsRepriced };
 }
