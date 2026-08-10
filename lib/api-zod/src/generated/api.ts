@@ -104,7 +104,8 @@ export const GetRacesResponseItem = zod.object({
   "message": zod.string()
 }))
 })),
-  "qualifiedCount": zod.int()
+  "qualifiedCount": zod.int(),
+  "dataSource": zod.enum(['live', 'mock']).nullish()
 })
 export const GetRacesResponse = zod.array(GetRacesResponseItem)
 
@@ -143,7 +144,8 @@ export const GetRaceResponse = zod.object({
   "message": zod.string()
 }))
 })),
-  "qualifiedCount": zod.int()
+  "qualifiedCount": zod.int(),
+  "dataSource": zod.enum(['live', 'mock']).nullish()
 })
 
 

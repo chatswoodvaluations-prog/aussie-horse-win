@@ -21,6 +21,7 @@ function buildRaceResponse(race: typeof racesTable.$inferSelect, runners: typeof
     fieldSize: race.fieldSize,
     distance: race.distance ?? null,
     qualifiedCount,
+    dataSource: (race.dataSource as "live" | "mock" | null) ?? null,
     runners: runners.map((r) => ({
       id: r.id,
       raceId: r.raceId,

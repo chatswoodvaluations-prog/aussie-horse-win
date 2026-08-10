@@ -343,6 +343,8 @@ components:
             $ref: "#/components/schemas/Runner"
         qualifiedCount:
           type: integer
+        dataSource:
+          $ref: "#/components/schemas/NominationDataSource"
       required:
         - id
         - trackName

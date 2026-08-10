@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Runner } from './runner';
+import type { NominationDataSource } from './nominationDataSource';
 
 export interface Race {
   id: number;
@@ -22,4 +23,6 @@ export interface Race {
   distance?: number | null;
   runners: Runner[];
   qualifiedCount: number;
+  /** @nullable */
+  dataSource?: NominationDataSource;
 }

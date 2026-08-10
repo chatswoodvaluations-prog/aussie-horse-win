@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { keepPreviousData } from '@tanstack/react-query';
 import { useGetRace, useRecordResult, getGetRaceQueryKey } from '@workspace/api-client-react';
-import type { Race } from '@workspace/api-client-react';
+import type { Race, NominationDataSource } from '@workspace/api-client-react';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
@@ -30,6 +30,22 @@ type Runner = Race['runners'][number];
 const SPEED_MAP_ORDER: Record<string, number> = {
   Lead: 1, 'On-Pace': 2, Handy: 3, Midfield: 4, 'Back-Marker': 5,
 };
+
+function DataSourceBadge({ dataSource, colors }: { dataSource: NominationDataSource | undefined; colors: ReturnType<typeof useColors> }) {
+  if (!dataSource) return null;
+  const isLive = dataSource === 'live';
+  return (
+    <View style={[
+      styles.dataSourceBadge,
+      { backgroundColor: isLive ? '#002E11' : colors.muted },
+    ]}>
+      <View style={[styles.dataSourceDot, { backgroundColor: isLive ? colors.primary : colors.mutedForeground }]} />
+      <Text style={[styles.dataSourceText, { color: isLive ? colors.primary : colors.mutedForeground }]}>
+        {isLive ? 'Live TAB odds' : 'Simulated'}
+      </Text>
+    </View>
+  );
+}
 
 function SpeedMapBadge({ position, colors }: { position: string; colors: ReturnType<typeof useColors> }) {
   const colorMap: Record<string, { bg: string; text: string }> = {
@@ -301,12 +317,14 @@ function shareRunner(runner: Runner, race: Race) {
 function RunnerCard({
   runner,
   isNominated,
+  dataSource,
   onSettle,
   onShare,
   colors,
 }: {
   runner: Runner;
   isNominated: boolean;
+  dataSource: NominationDataSource | undefined;
   onSettle: (runner: Runner) => void;
   onShare: (runner: Runner) => void;
   colors: ReturnType<typeof useColors>;
@@ -372,6 +390,13 @@ function RunnerCard({
               J: {runner.jockey}{runner.trainer ? ` · T: ${runner.trainer}` : ''}
             </Text>
           )}
+        </View>
+      )}
+
+      {/* Data source badge for nominated runners */}
+      {isNominated && (
+        <View style={styles.runnerBadgeRow}>
+          <DataSourceBadge dataSource={dataSource} colors={colors} />
         </View>
       )}
 
@@ -506,6 +531,7 @@ export default function RaceDetailScreen() {
           <RunnerCard
             runner={item}
             isNominated={nominatedRunnerIds.has(item.id)}
+            dataSource={race.dataSource}
             onSettle={setSettleRunner}
             onShare={(runner) => shareRunner(runner, race)}
             colors={colors}
@@ -612,6 +638,25 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   settleBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  runnerBadgeRow: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  dataSourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  dataSourceDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  dataSourceText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 15, textAlign: 'center' },
   retryBtn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 6, borderWidth: 1 },
   retryText: { fontFamily: 'Inter_500Medium', fontSize: 14 },

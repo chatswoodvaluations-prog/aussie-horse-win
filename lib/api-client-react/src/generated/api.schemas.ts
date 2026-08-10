@@ -85,6 +85,8 @@ export interface Race {
   distance?: number | null;
   runners: Runner[];
   qualifiedCount: number;
+  /** @nullable */
+  dataSource?: NominationDataSource;
 }
 
 export type NominationStatus = typeof NominationStatus[keyof typeof NominationStatus];
