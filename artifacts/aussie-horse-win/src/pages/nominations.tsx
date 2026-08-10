@@ -463,9 +463,9 @@ function NominationCard({ nom }: { nom: Nomination }) {
 }
 
 /**
- * Displays a side-by-side TAB vs Ladbrokes odds comparison row.
- * - Green highlight when Ladbrokes > TAB (better deal)
- * - Dimmed when Ladbrokes < TAB
+ * Displays a side-by-side race card vs Ladbrokes odds comparison row.
+ * - Green highlight when Ladbrokes > race card price (better deal)
+ * - Dimmed when Ladbrokes < race card price
  * - "—" when Ladbrokes price is not available
  */
 function OddsComparisonRow({ nom }: { nom: Nomination }) {
@@ -488,7 +488,7 @@ function OddsComparisonRow({ nom }: { nom: Nomination }) {
       {/* Header row */}
       <div className="grid grid-cols-3 bg-secondary/50 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
         <span></span>
-        <span className="text-center">TAB</span>
+        <span className="text-center">CARD</span>
         <span className="text-center">LADS</span>
       </div>
 

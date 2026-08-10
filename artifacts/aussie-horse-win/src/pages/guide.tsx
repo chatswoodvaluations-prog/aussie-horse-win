@@ -149,7 +149,7 @@ export default function GuidePage() {
           </div>
           <div className="flex gap-2 items-start">
             <ChevronRight className="size-3.5 text-primary mt-1 shrink-0" />
-            <p><span className="text-foreground font-medium">TAB / LADS columns</span> — compare the odds across bookmakers. Green price = better value.</p>
+            <p><span className="text-foreground font-medium">CARD / LADS columns</span> — CARD is the race card price; LADS is the Ladbrokes fixed-odds price. Green = better value.</p>
           </div>
           <div className="flex gap-2 items-start">
             <ChevronRight className="size-3.5 text-primary mt-1 shrink-0" />
