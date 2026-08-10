@@ -51,7 +51,7 @@ function getProxyAgent(): SocksProxyAgent | null {
 }
 
 const TAB_BASE = "https://api.tab.com.au/v1/tab-info-service";
-const FETCH_TIMEOUT_MS = 15_000;
+const FETCH_TIMEOUT_MS = 5_000; // TAB is always blocked from datacenter IPs — fail fast
 
 // ── TAB API response types ──────────────────────────────────────────────────
 

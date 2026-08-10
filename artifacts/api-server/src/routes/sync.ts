@@ -425,7 +425,7 @@ router.post("/sync", async (req, res): Promise<void> => {
   // All dates are fetched in parallel. The entire Ladbrokes enrichment — fetch
   // + apply — must complete within LADBROKES_BUDGET_MS or it is aborted so the
   // selection engine is never delayed by an unresponsive odds feed.
-  const LADBROKES_BUDGET_MS = 30_000;
+  const LADBROKES_BUDGET_MS = 15_000;
 
   await Promise.race([
     // Actual work — parallel fetch across all dates

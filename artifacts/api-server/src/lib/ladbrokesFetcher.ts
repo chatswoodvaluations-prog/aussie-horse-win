@@ -17,36 +17,14 @@
  */
 
 import nodeFetch from "node-fetch";
-import { SocksProxyAgent } from "socks-proxy-agent";
 import { logger } from "./logger";
 import type { LiveMeeting, LiveRace, LiveRunner, SpeedMapPosition } from "./tabFetcher";
 
-// ── SOCKS5 proxy (shared credential pattern — same as tabFetcher) ────────────
-
-let _agent: SocksProxyAgent | null | undefined = undefined;
-
-function getProxyAgent(): SocksProxyAgent | null {
-  if (_agent !== undefined) return _agent;
-
-  const user = process.env.NORDVPN_SOCKS5_USER;
-  const pass = process.env.NORDVPN_SOCKS5_PASS;
-  const host = process.env.NORDVPN_SOCKS5_HOST ?? "au1025.nordvpn.com";
-  const port = process.env.NORDVPN_SOCKS5_PORT ?? "1080";
-
-  if (!user || !pass) {
-    logger.info("Ladbrokes proxy: no SOCKS5 credentials — requests will go direct");
-    _agent = null;
-    return null;
-  }
-
-  const proxyUrl = `socks5h://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
-  _agent = new SocksProxyAgent(proxyUrl);
-  logger.info({ host, port }, "Ladbrokes proxy: SOCKS5 agent initialised");
-  return _agent;
-}
+// No proxy — Oracle server has an AU IP so requests go direct.
+// NordVPN SOCKS5 was removed because proxy hangs cause sync timeouts.
 
 const LADS_BASE = "https://api.ladbrokes.com.au/v2/racing";
-const FETCH_TIMEOUT_MS = 15_000;
+const FETCH_TIMEOUT_MS = 10_000;
 
 // ── Ladbrokes API response shapes ────────────────────────────────────────────
 
@@ -183,17 +161,13 @@ export function parseLadbrokesOverview(
 async function fetchJson(url: string): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  const agent = getProxyAgent();
 
   try {
     const resp = await nodeFetch(url, {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       signal: controller.signal as any,
-      agent: agent ?? undefined,
       headers: {
-        // Use */* to avoid triggering content-type negotiation that some
-        // Ladbrokes API versions reject ("unsupported content-type").
-        Accept: "*/*",
+        Accept: "application/json, */*",
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
       },
@@ -203,7 +177,8 @@ async function fetchJson(url: string): Promise<unknown> {
       throw new Error(`HTTP ${resp.status} from ${url}`);
     }
 
-    return await resp.json();
+    const text = await resp.text();
+    return JSON.parse(text);
   } finally {
     clearTimeout(timer);
   }
@@ -383,26 +358,21 @@ async function fillEventCards(
       continue;
     }
 
-    const races: LadbrokesRace[] = [];
-    for (const race of meeting.races ?? []) {
-      if ((race.runners ?? []).length > 0 || !race.id) {
-        races.push(race);
-        continue;
-      }
-
-      try {
-        const card = (await fetchJson(
-          `${LADS_BASE}/event-card?id=${race.id}`
-        )) as { runners?: LadbrokesRunner[] };
-        races.push({ ...race, runners: card.runners ?? [] });
-      } catch (err) {
-        logger.debug(
-          { raceId: race.id, err },
-          "Ladbrokes: failed to fetch event card — skipping race"
-        );
-        races.push(race); // keep the race without runners; parser will skip it
-      }
-    }
+    // Fetch all missing event cards in parallel instead of sequentially
+    const races = await Promise.all(
+      (meeting.races ?? []).map(async (race) => {
+        if ((race.runners ?? []).length > 0 || !race.id) return race;
+        try {
+          const card = (await fetchJson(
+            `${LADS_BASE}/event-card?id=${race.id}`
+          )) as { runners?: LadbrokesRunner[] };
+          return { ...race, runners: card.runners ?? [] };
+        } catch (err) {
+          logger.debug({ raceId: race.id, err }, "Ladbrokes: failed to fetch event card — skipping race");
+          return race;
+        }
+      })
+    );
 
     meetings.push({ ...meeting, races });
   }
