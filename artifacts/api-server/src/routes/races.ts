@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, racesTable, runnersTable, nominationsTable, betResultsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { GetRacesResponse, GetRaceResponse, GetRaceParams, RecordResultParams, RecordResultBody, RecordResultResponse } from "@workspace/api-zod";
 
 const router = Router();
@@ -43,13 +43,42 @@ function buildRaceResponse(race: typeof racesTable.$inferSelect, runners: typeof
 }
 
 router.get("/races", async (req, res): Promise<void> => {
-  const races = await db.select().from(racesTable).orderBy(racesTable.raceDate, racesTable.raceNumber);
-  const result = await Promise.all(
-    races.map(async (race) => {
-      const runners = await db.select().from(runnersTable).where(eq(runnersTable.raceId, race.id));
-      return buildRaceResponse(race, runners);
-    })
-  );
+  // Default window: 14 days back → 7 days forward (covers settling recent bets + upcoming races).
+  // Callers can override with ?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD.
+  const { dateFrom, dateTo } = req.query as { dateFrom?: string; dateTo?: string };
+
+  const now = new Date();
+  const fallbackFrom = new Date(now);
+  fallbackFrom.setDate(fallbackFrom.getDate() - 14);
+  const fallbackTo = new Date(now);
+  fallbackTo.setDate(fallbackTo.getDate() + 7);
+
+  const from = dateFrom ?? fallbackFrom.toISOString().slice(0, 10);
+  const to   = dateTo   ?? fallbackTo.toISOString().slice(0, 10);
+
+  const races = await db
+    .select()
+    .from(racesTable)
+    .where(and(gte(racesTable.raceDate, from), lte(racesTable.raceDate, to)))
+    .orderBy(racesTable.raceDate, racesTable.raceNumber);
+
+  if (races.length === 0) {
+    res.json(GetRacesResponse.parse([]));
+    return;
+  }
+
+  // Fetch all runners in one query then group — avoids N+1 with thousands of races.
+  const raceIds = races.map((r) => r.id);
+  const allRunners = await db.select().from(runnersTable).where(inArray(runnersTable.raceId, raceIds));
+
+  const runnersByRaceId = new Map<number, (typeof runnersTable.$inferSelect)[]>();
+  for (const runner of allRunners) {
+    const list = runnersByRaceId.get(runner.raceId) ?? [];
+    list.push(runner);
+    runnersByRaceId.set(runner.raceId, list);
+  }
+
+  const result = races.map((race) => buildRaceResponse(race, runnersByRaceId.get(race.id) ?? []));
   res.json(GetRacesResponse.parse(result));
 });
 
