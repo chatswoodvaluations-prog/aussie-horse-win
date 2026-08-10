@@ -44,6 +44,8 @@ module.exports = {
       PORT: 8080,
       DATABASE_URL: '${DATABASE_URL}',
       SESSION_SECRET: '${SESSION_SECRET}',
+      LADBROKES_RELAY_URL: '${LADBROKES_RELAY_URL}',
+      LADBROKES_RELAY_KEY: '${LADBROKES_RELAY_KEY}',
     }
   }]
 };

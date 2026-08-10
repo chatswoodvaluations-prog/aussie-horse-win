@@ -20,11 +20,19 @@ import nodeFetch from "node-fetch";
 import { logger } from "./logger";
 import type { LiveMeeting, LiveRace, LiveRunner, SpeedMapPosition } from "./tabFetcher";
 
-// No proxy — Oracle server has an AU IP so requests go direct.
-// NordVPN SOCKS5 was removed because proxy hangs cause sync timeouts.
+// ── Relay configuration ───────────────────────────────────────────────────────
+// If LADBROKES_RELAY_URL is set, all requests are routed through that URL
+// (expected to be a Cloudflare Worker that proxies to api.ladbrokes.com.au).
+// This bypasses IP blocks on datacenter servers including Replit and Oracle.
+//
+// Set LADBROKES_RELAY_URL=https://ladbrokes-relay.YOUR-ACCOUNT.workers.dev
+// Optionally set LADBROKES_RELAY_KEY to match the worker's RELAY_KEY secret.
+const RELAY_URL = process.env.LADBROKES_RELAY_URL?.replace(/\/$/, "");
+const RELAY_KEY = process.env.LADBROKES_RELAY_KEY;
 
-const LADS_BASE = "https://api.ladbrokes.com.au/v2/racing";
-const FETCH_TIMEOUT_MS = 10_000;
+const LADS_ORIGIN = RELAY_URL ?? "https://api.ladbrokes.com.au";
+const LADS_BASE = `${LADS_ORIGIN}/v2/racing`;
+const FETCH_TIMEOUT_MS = 15_000;
 
 // ── Ladbrokes API response shapes ────────────────────────────────────────────
 
@@ -163,14 +171,18 @@ async function fetchJson(url: string): Promise<unknown> {
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
+    const headers: Record<string, string> = {
+      Accept: "application/json, */*",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    };
+    // When routing through the Cloudflare relay, attach the auth key if configured
+    if (RELAY_KEY) headers["X-Relay-Key"] = RELAY_KEY;
+
     const resp = await nodeFetch(url, {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       signal: controller.signal as any,
-      headers: {
-        Accept: "application/json, */*",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      },
+      headers,
     });
 
     if (!resp.ok) {

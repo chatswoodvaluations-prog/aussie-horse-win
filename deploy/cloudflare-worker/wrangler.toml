@@ -1,0 +1,6 @@
+name = "ladbrokes-relay"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# No routes needed — the worker URL is called directly by the API server.
+# Set the optional auth secret with: wrangler secret put RELAY_KEY
