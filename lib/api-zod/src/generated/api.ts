@@ -45,7 +45,7 @@ export const GetNominationsResponseItem = zod.object({
   "projectedPlaceReturn": zod.number(),
   "jockey": zod.string().nullish(),
   "trainer": zod.string().nullish(),
-  "status": zod.enum(['Pending', 'Won', 'Placed', 'Unplaced']),
+  "status": zod.enum(['Pending', 'Won', 'Placed', 'Unplaced', 'Cancelled']),
   "dataSource": zod.union([zod.literal('live'),zod.literal('mock'),zod.literal(null)]).nullish().describe('Whether odds came from the live TAB feed (\"live\") or the mock generator (\"mock\")'),
   "netResult": zod.number().nullish().describe('Actual net profit\/loss for settled nominations (actualWinReturn + actualPlaceReturn - totalOutlay); null for Pending'),
   "actualWinReturn": zod.number().nullish().describe('Actual win return received at settlement; null for Pending or when no win dividend was paid'),
@@ -311,6 +311,7 @@ export const GetTrackBreakdownResponse = zod.array(GetTrackBreakdownResponseItem
  * @summary Trigger race data sync
  */
 export const triggerSyncResponseNominationsRepricedDefault = 0;
+export const triggerSyncResponseNominationsCancelledDefault = 0;
 
 export const TriggerSyncResponse = zod.object({
   "racesFound": zod.number().int(),
@@ -318,6 +319,7 @@ export const TriggerSyncResponse = zod.object({
   "runnersAdded": zod.number().int(),
   "nominationsGenerated": zod.number().int(),
   "nominationsRepriced": zod.number().int().default(triggerSyncResponseNominationsRepricedDefault).describe('Number of Pending nominations updated with fresh odds this sync'),
+  "nominationsCancelled": zod.number().int().default(triggerSyncResponseNominationsCancelledDefault).describe('Number of Pending nominations cancelled because odds drifted outside the window'),
   "message": zod.string()
 })
 

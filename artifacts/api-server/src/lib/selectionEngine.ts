@@ -88,6 +88,14 @@ export interface InsertNominationData {
   status: string;
 }
 
+export interface EngineBatchRunner extends EngineRunner {
+  raceId: number;
+}
+
+export interface EngineBatchNomination extends EngineNomination {
+  runnerId: number;
+}
+
 export interface SelectionEngineDb {
   /** Returns current settings (never throws; returns defaults when no row exists). */
   getSettings(): Promise<Settings>;
@@ -95,6 +103,10 @@ export interface SelectionEngineDb {
   getEnabledTracks(): Promise<EngineTrack[]>;
   /** Returns every race row (caller filters by trackId). */
   getAllRaces(): Promise<EngineRace[]>;
+  /** Batch-loads all runners for the given race IDs (avoids N+1). */
+  getAllRunnersForRaces(raceIds: number[]): Promise<EngineBatchRunner[]>;
+  /** Batch-loads all nominations for the given race IDs (avoids N+1). */
+  getAllNominationsForRaces(raceIds: number[]): Promise<EngineBatchNomination[]>;
   /** Returns all runners for a given race. */
   getRunnersForRace(raceId: number): Promise<EngineRunner[]>;
   /** Persists the filter-evaluation result back to the runner row. */
@@ -111,6 +123,8 @@ export interface SelectionEngineDb {
       projectedPlaceReturn: number;
     }
   ): Promise<void>;
+  /** Cancels a Pending nomination whose runner no longer passes filters. */
+  cancelNomination(id: number): Promise<void>;
   /** Inserts a brand-new nomination for a qualifying runner. */
   insertNomination(data: InsertNominationData): Promise<void>;
 }
@@ -133,6 +147,24 @@ function makeDrizzleSelectionEngineDb(): SelectionEngineDb {
 
     async getAllRaces() {
       return db.select().from(racesTable);
+    },
+
+    async getAllRunnersForRaces(raceIds) {
+      if (raceIds.length === 0) return [];
+      const rows = await db.select().from(runnersTable).where(inArray(runnersTable.raceId, raceIds));
+      return rows;
+    },
+
+    async getAllNominationsForRaces(raceIds) {
+      if (raceIds.length === 0) return [];
+      const rows = await db.select({
+        id: nominationsTable.id,
+        runnerId: nominationsTable.runnerId,
+        status: nominationsTable.status,
+        winStake: nominationsTable.winStake,
+        placeStake: nominationsTable.placeStake,
+      }).from(nominationsTable).where(inArray(nominationsTable.raceId, raceIds));
+      return rows;
     },
 
     async getRunnersForRace(raceId) {
@@ -158,6 +190,10 @@ function makeDrizzleSelectionEngineDb(): SelectionEngineDb {
 
     async updateNomination(id, data) {
       await db.update(nominationsTable).set(data).where(eq(nominationsTable.id, id));
+    },
+
+    async cancelNomination(id) {
+      await db.update(nominationsTable).set({ status: "Cancelled" }).where(eq(nominationsTable.id, id));
     },
 
     async insertNomination(data) {
@@ -275,6 +311,7 @@ export async function runSelectionEngine(
   runnersAdded: number;
   nominationsGenerated: number;
   nominationsRepriced: number;
+  nominationsCancelled: number;
 }> {
   const edb = engineDb ?? makeDrizzleSelectionEngineDb();
 
@@ -291,21 +328,16 @@ export async function runSelectionEngine(
   const races = allRaces.filter((r) => trackIdSet.has(r.trackId));
 
   if (races.length === 0) {
-    return { racesFound: 0, racesAdded: 0, runnersAdded: 0, nominationsGenerated: 0, nominationsRepriced: 0 };
+    return { racesFound: 0, racesAdded: 0, runnersAdded: 0, nominationsGenerated: 0, nominationsRepriced: 0, nominationsCancelled: 0 };
   }
 
   // ── Batch-load ALL runners and nominations in two queries (avoid N+1) ────────
   const raceIdSet = new Set(races.map((r) => r.id));
+  const raceIdList = [...raceIdSet];
 
   const [allRunners, allNominations] = await Promise.all([
-    db.select().from(runnersTable).where(inArray(runnersTable.raceId, [...raceIdSet])),
-    db.select({
-      id: nominationsTable.id,
-      runnerId: nominationsTable.runnerId,
-      status: nominationsTable.status,
-      winStake: nominationsTable.winStake,
-      placeStake: nominationsTable.placeStake,
-    }).from(nominationsTable).where(inArray(nominationsTable.raceId, [...raceIdSet])),
+    edb.getAllRunnersForRaces(raceIdList),
+    edb.getAllNominationsForRaces(raceIdList),
   ]);
 
   // Index for fast lookup
@@ -324,10 +356,12 @@ export async function runSelectionEngine(
   // ── Collect all writes, then flush in parallel ────────────────────────────────
   const runnerUpdates: Array<{ id: number; data: Parameters<typeof edb.updateRunner>[1] }> = [];
   const nominationUpdates: Array<{ id: number; data: Parameters<typeof edb.updateNomination>[1] }> = [];
+  const nominationCancels: Array<{ id: number }> = [];
   const nominationInserts: Array<Parameters<typeof edb.insertNomination>[0]> = [];
 
   let nominationsGenerated = 0;
   let nominationsRepriced = 0;
+  let nominationsCancelled = 0;
 
   for (const race of races) {
     const runners = runnersByRace.get(race.id) ?? [];
@@ -342,13 +376,21 @@ export async function runSelectionEngine(
 
       if (pendingNoms.length > 0) {
         for (const nom of pendingNoms) {
-          const projectedWinReturn = nom.winStake * runner.winOdds + nom.placeStake * runner.placeOdds;
-          const projectedPlaceReturn = nom.placeStake * runner.placeOdds;
-          nominationUpdates.push({
-            id: nom.id,
-            data: { winOdds: runner.winOdds, placeOdds: runner.placeOdds, projectedWinReturn, projectedPlaceReturn },
-          });
-          nominationsRepriced++;
+          if (!passed) {
+            // Runner no longer qualifies — cancel the pending nomination so punters
+            // are not left holding a stale selection that drifted outside the window.
+            nominationCancels.push({ id: nom.id });
+            nominationsCancelled++;
+          } else {
+            // Runner still qualifies — reprice with fresh odds.
+            const projectedWinReturn = nom.winStake * runner.winOdds + nom.placeStake * runner.placeOdds;
+            const projectedPlaceReturn = nom.placeStake * runner.placeOdds;
+            nominationUpdates.push({
+              id: nom.id,
+              data: { winOdds: runner.winOdds, placeOdds: runner.placeOdds, projectedWinReturn, projectedPlaceReturn },
+            });
+            nominationsRepriced++;
+          }
         }
       } else if (passed && existing.length === 0) {
         const projectedWinReturn = settings.winStake * runner.winOdds + settings.placeStake * runner.placeOdds;
@@ -383,14 +425,15 @@ export async function runSelectionEngine(
     }
   }
 
-  // Flush all writes in parallel (runner updates + nomination updates + inserts)
+  // Flush all writes in parallel (runner updates + nomination updates + cancels + inserts)
   await Promise.all([
     ...runnerUpdates.map(({ id, data }) => edb.updateRunner(id, data)),
     ...nominationUpdates.map(({ id, data }) => edb.updateNomination(id, data)),
+    ...nominationCancels.map(({ id }) => edb.cancelNomination(id)),
     ...nominationInserts.map((data) => edb.insertNomination(data)),
   ]);
 
-  logger.info({ nominationsGenerated, nominationsRepriced }, "Selection engine run complete");
+  logger.info({ nominationsGenerated, nominationsRepriced, nominationsCancelled }, "Selection engine run complete");
 
-  return { racesFound: races.length, racesAdded: 0, runnersAdded: 0, nominationsGenerated, nominationsRepriced };
+  return { racesFound: races.length, racesAdded: 0, runnersAdded: 0, nominationsGenerated, nominationsRepriced, nominationsCancelled };
 }

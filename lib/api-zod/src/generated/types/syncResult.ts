@@ -13,5 +13,7 @@ export interface SyncResult {
   nominationsGenerated: number;
   /** Number of Pending nominations updated with fresh odds this sync */
   nominationsRepriced: number;
+  /** Number of Pending nominations cancelled because odds drifted outside the window */
+  nominationsCancelled: number;
   message: string;
 }

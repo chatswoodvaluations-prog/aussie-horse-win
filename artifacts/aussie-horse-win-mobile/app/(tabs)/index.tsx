@@ -28,8 +28,8 @@ import {
 } from '@workspace/api-client-react';
 import type { Nomination } from '@workspace/api-client-react';
 
-type StatusFilter = 'All' | 'Pending' | 'Won' | 'Placed' | 'Unplaced';
-const STATUS_FILTERS: StatusFilter[] = ['All', 'Pending', 'Won', 'Placed', 'Unplaced'];
+type StatusFilter = 'All' | 'Pending' | 'Won' | 'Placed' | 'Unplaced' | 'Cancelled';
+const STATUS_FILTERS: StatusFilter[] = ['All', 'Pending', 'Won', 'Placed', 'Unplaced', 'Cancelled'];
 
 function DataSourceBadge({ dataSource }: { dataSource: Nomination['dataSource'] }) {
   const colors = useColors();
@@ -51,10 +51,11 @@ function DataSourceBadge({ dataSource }: { dataSource: Nomination['dataSource'] 
 function StatusBadge({ status }: { status: Nomination['status'] }) {
   const colors = useColors();
   const badgeColors: Record<Nomination['status'], { bg: string; text: string }> = {
-    Pending: { bg: colors.secondary, text: colors.mutedForeground },
-    Won:     { bg: '#002E11', text: colors.primary },
-    Placed:  { bg: '#1A2E00', text: '#A3E635' },
-    Unplaced: { bg: '#2A0A0A', text: colors.destructive },
+    Pending:   { bg: colors.secondary, text: colors.mutedForeground },
+    Won:       { bg: '#002E11', text: colors.primary },
+    Placed:    { bg: '#1A2E00', text: '#A3E635' },
+    Unplaced:  { bg: '#2A0A0A', text: colors.destructive },
+    Cancelled: { bg: colors.muted, text: colors.mutedForeground },
   };
   const c = badgeColors[status];
   return (
@@ -118,7 +119,7 @@ function NominationCard({ item }: { item: Nomination }) {
         <StatItem label="Place" value={`$${item.placeOdds.toFixed(1)}`} colors={colors} />
         <StatItem label="Barrier" value={`${item.barrierNumber}`} colors={colors} />
         <StatItem label="Outlay" value={`$${item.totalOutlay.toFixed(0)}`} colors={colors} />
-        {!isPending && (
+        {item.status !== 'Pending' && item.status !== 'Cancelled' && (
           <View style={styles.statItem}>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Net</Text>
             <Text style={[

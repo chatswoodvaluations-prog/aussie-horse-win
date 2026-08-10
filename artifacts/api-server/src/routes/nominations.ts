@@ -37,7 +37,7 @@ router.get("/nominations", async (req, res): Promise<void> => {
     projectedPlaceReturn: nominations.projectedPlaceReturn,
     jockey: nominations.jockey ?? null,
     trainer: nominations.trainer ?? null,
-    status: nominations.status as "Pending" | "Won" | "Placed" | "Unplaced",
+    status: nominations.status as "Pending" | "Won" | "Placed" | "Unplaced" | "Cancelled",
     dataSource: races?.dataSource ?? null,
     netResult: bet_results?.netResult ?? null,
     actualWinReturn: bet_results?.actualWinReturn ?? null,
@@ -48,8 +48,10 @@ router.get("/nominations", async (req, res): Promise<void> => {
 router.get("/nominations/summary", async (req, res): Promise<void> => {
   const nominations = await db.select().from(nominationsTable);
 
-  const totalNominations = nominations.length;
-  const totalOutlay = nominations.reduce((sum, n) => sum + n.totalOutlay, 0);
+  // Cancelled nominations were never placed as bets — exclude from totals.
+  const activeNominations = nominations.filter((n) => n.status !== "Cancelled");
+  const totalNominations = activeNominations.length;
+  const totalOutlay = activeNominations.reduce((sum, n) => sum + n.totalOutlay, 0);
 
   // By track
   const trackMap: Record<string, number> = {};

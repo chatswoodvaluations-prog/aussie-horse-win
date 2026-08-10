@@ -413,7 +413,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          enum: [Pending, Won, Placed, Unplaced]
+          enum: [Pending, Won, Placed, Unplaced, Cancelled]
         dataSource:
           type: ["string", "null"]
           enum: [live, mock, null]
@@ -718,6 +718,10 @@ components:
           type: integer
           description: Number of Pending nominations updated with fresh odds this sync
           default: 0
+        nominationsCancelled:
+          type: integer
+          description: Number of Pending nominations cancelled because odds drifted outside the window
+          default: 0
         message:
           type: string
       required:
@@ -726,4 +730,5 @@ components:
         - runnersAdded
         - nominationsGenerated
         - nominationsRepriced
+        - nominationsCancelled
         - message

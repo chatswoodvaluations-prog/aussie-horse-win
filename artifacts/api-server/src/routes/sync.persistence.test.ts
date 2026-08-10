@@ -564,6 +564,25 @@ function makeToggleTestDb(
       }));
     },
 
+    async getAllRunnersForRaces(raceIds) {
+      const idSet = new Set(raceIds);
+      return tRunners.select((r) => idSet.has(r.raceId)).map((r) => ({
+        id: r.id, raceId: r.raceId, horseName: r.horseName,
+        barrierNumber: r.barrierNumber, speedMapPosition: r.speedMapPosition,
+        winOdds: r.winOdds, placeOdds: r.placeOdds,
+        jockey: r.jockey, trainer: r.trainer,
+        ladbrokesWinOdds: null, ladbrokesPlaceOdds: null,
+      }));
+    },
+
+    async getAllNominationsForRaces(raceIds) {
+      const idSet = new Set(raceIds);
+      return tNominations.select((n) => idSet.has(n.raceId)).map((n) => ({
+        id: n.id, runnerId: n.runnerId, status: n.status,
+        winStake: n.winStake, placeStake: n.placeStake,
+      }));
+    },
+
     async updateRunner(id, data) {
       tRunners.update((r) => r.id === id, data as Partial<RunnerRow>);
     },
@@ -576,6 +595,10 @@ function makeToggleTestDb(
 
     async updateNomination(id, data) {
       tNominations.update((n) => n.id === id, data as Partial<NominationRow>);
+    },
+
+    async cancelNomination(id) {
+      tNominations.update((n) => n.id === id, { status: "Cancelled" } as Partial<NominationRow>);
     },
 
     async insertNomination(data) {
@@ -737,5 +760,82 @@ describe("track toggle — real selection engine respects enabledTrackIds on eac
       0,
       "disabled track must produce zero nominations on the next sync"
     );
+  });
+});
+
+// ── Odds-drift cancellation tests ─────────────────────────────────────────────
+//
+// Verifies that when a runner's odds drift outside the filter window after a
+// Pending nomination has already been created, the engine:
+//   1. Cancels (not reprices) the nomination.
+//   2. Reports the correct cancellation count.
+//   3. Does not re-nominate the runner even when odds drift back in-window.
+
+describe("odds-drift cancellation — engine cancels Pending nominations when runner no longer qualifies", () => {
+
+  it("nomination is cancelled when odds drift outside the window; no re-nomination when odds return", async () => {
+    const tTracks      = new Table<TrackRow>();
+    const tRaces       = new Table<RaceRow>();
+    const tRunners     = new Table<RunnerRow>();
+    const tNominations = new Table<NominationRow>();
+    const tSettings    = new Table<SettingsRow>();
+
+    const track = tTracks.insert({ name: "Drift Track", state: "VIC", type: "Regional", enabled: true });
+    const race  = tRaces.insert({
+      trackId: track.id, trackName: "Drift Track", state: "VIC",
+      raceNumber: 1, raceName: "Drift Race",
+      raceDate: "2026-08-10", raceTime: "13:00",
+      fieldSize: 9, distance: 1200,   // fieldSize 9 is within 8–11
+    });
+    const runner = tRunners.insert({
+      raceId: race.id, horseName: "Drifter",
+      barrierNumber: 2, speedMapPosition: "Lead",
+      winOdds: 6.0, placeOdds: 2.1,  // inside window ($5–$10); place >= $1.85
+      jockey: "J. McDonald", trainer: "C. Waller",
+      passed: false, filterResults: "[]",
+    });
+
+    tSettings.insert({
+      fieldSizeMin: 8, fieldSizeMax: 11,
+      minWinOdds: 5.0, maxWinOdds: 10.0,
+      minPlaceOdds: 1.85, winStake: 5, placeStake: 20,
+      enabledTrackIds: JSON.stringify([track.id]),
+    });
+
+    const edb = makeToggleTestDb(tTracks, tRaces, tRunners, tNominations, tSettings);
+
+    // ── Sync 1: runner qualifies → Pending nomination created ─────────────────
+    const result1 = await runSelectionEngine(edb);
+    assert.equal(result1.nominationsGenerated, 1, "sync 1: one nomination must be generated");
+    assert.equal(result1.nominationsCancelled, 0, "sync 1: no cancellations");
+
+    const nomsAfterSync1 = tNominations.select();
+    assert.equal(nomsAfterSync1.length, 1);
+    assert.equal(nomsAfterSync1[0].status, "Pending");
+
+    // ── Drift odds outside the window ($12 > $10 max) ────────────────────────
+    tRunners.update((r) => r.id === runner.id, { winOdds: 12.0 });
+
+    // ── Sync 2: runner fails → nomination cancelled ───────────────────────────
+    const result2 = await runSelectionEngine(edb);
+    assert.equal(result2.nominationsCancelled, 1, "sync 2: one cancellation due to odds drift");
+    assert.equal(result2.nominationsRepriced,  0, "sync 2: no repricing when runner fails");
+    assert.equal(result2.nominationsGenerated, 0, "sync 2: no new nomination");
+
+    const nomsAfterSync2 = tNominations.select();
+    assert.equal(nomsAfterSync2.length, 1, "nomination row must still exist");
+    assert.equal(nomsAfterSync2[0].status, "Cancelled", "nomination must be Cancelled after drift");
+
+    // ── Drift odds back inside the window ($7) ────────────────────────────────
+    tRunners.update((r) => r.id === runner.id, { winOdds: 7.0 });
+
+    // ── Sync 3: cancelled nomination blocks re-nomination ─────────────────────
+    const result3 = await runSelectionEngine(edb);
+    assert.equal(result3.nominationsGenerated, 0, "sync 3: cancelled runner must not be re-nominated");
+    assert.equal(result3.nominationsCancelled, 0, "sync 3: already-cancelled row must not trigger another cancel");
+
+    const nomsAfterSync3 = tNominations.select();
+    assert.equal(nomsAfterSync3.length, 1, "still only one nomination row");
+    assert.equal(nomsAfterSync3[0].status, "Cancelled", "status must remain Cancelled");
   });
 });

@@ -366,6 +366,8 @@ router.post("/sync", async (req, res): Promise<void> => {
         racesAdded: 0,
         runnersAdded: 0,
         nominationsGenerated: 0,
+        nominationsRepriced: 0,
+        nominationsCancelled: 0,
         message: "No enabled tracks found",
       })
     );
@@ -542,7 +544,8 @@ router.post("/sync", async (req, res): Promise<void> => {
     runnersAdded,
     nominationsGenerated: engineResult.nominationsGenerated,
     nominationsRepriced: engineResult.nominationsRepriced,
-    message: `Sync complete (source: ${dataSource}). Added ${racesAdded} races and ${runnersAdded} runners. Generated ${engineResult.nominationsGenerated} new nominations. Repriced ${engineResult.nominationsRepriced} pending nominations.`,
+    nominationsCancelled: engineResult.nominationsCancelled,
+    message: `Sync complete (source: ${dataSource}). Added ${racesAdded} races and ${runnersAdded} runners. Generated ${engineResult.nominationsGenerated} new nominations. Repriced ${engineResult.nominationsRepriced} pending nominations. Cancelled ${engineResult.nominationsCancelled} due to odds drift.`,
     ...(liveError ? { liveError } : {}),
   };
 
