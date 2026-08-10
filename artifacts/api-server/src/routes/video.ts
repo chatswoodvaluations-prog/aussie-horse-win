@@ -31,10 +31,22 @@ const router = Router();
 
 // ─── Paths ────────────────────────────────────────────────────────────────────
 
-// __dirname is injected by the esbuild banner; the built file lives at
-// artifacts/api-server/dist/index.mjs, so two levels up reaches artifacts/
-function resolveFromDist(...parts: string[]) {
-  return path.resolve(__dirname, "..", "..", ...parts);
+/**
+ * Resolve a path relative to the workspace artifacts/ directory.
+ *
+ * Two environments are supported:
+ *  - Built output (esbuild): __dirname is injected by the esbuild banner and
+ *    points to dist/, so two levels up reaches artifacts/.
+ *  - ESM test environment (tsx): __dirname is not defined; import.meta.url
+ *    points to src/routes/video.ts, so three levels up reaches artifacts/.
+ */
+function resolveFromDist(...parts: string[]): string {
+  const g = globalThis as Record<string, unknown>;
+  const artifactsDir =
+    typeof g["__dirname"] === "string"
+      ? path.resolve(g["__dirname"] as string, "..", "..")
+      : path.resolve(new URL(".", import.meta.url).pathname, "..", "..", "..");
+  return path.join(artifactsDir, ...parts);
 }
 
 const VIDEO_BUILD_DIR = resolveFromDist(
@@ -96,12 +108,12 @@ const RATE_WINDOW_MS = 2 * 60 * 1_000; // 2 min between renders per IP
  *  b) The video source build directory has been modified more recently than
  *     the cached file (i.e. the video was rebuilt since the last render).
  */
-const CACHE_TTL_MS = 24 * 60 * 60 * 1_000; // 24 hours
-const CACHE_DIR    = path.join(os.tmpdir(), "video-render-cache");
-const CACHE_FILE   = path.join(CACHE_DIR, "aussie-horse-win.mp4");
+export const CACHE_TTL_MS = 24 * 60 * 60 * 1_000; // 24 hours
+export const CACHE_DIR    = path.join(os.tmpdir(), "video-render-cache");
+export const CACHE_FILE   = path.join(CACHE_DIR, "aussie-horse-win.mp4");
 
 /** Ensure the cache directory exists. */
-function ensureCacheDir(): void {
+export function ensureCacheDir(): void {
   if (!fs.existsSync(CACHE_DIR)) {
     fs.mkdirSync(CACHE_DIR, { recursive: true });
   }
@@ -112,7 +124,7 @@ function ensureCacheDir(): void {
  * "Fresh" means: file exists, not older than CACHE_TTL_MS, and the video
  * source build has not been modified since the render.
  */
-function isCacheValid(): boolean {
+export function isCacheValid(): boolean {
   if (!fs.existsSync(CACHE_FILE)) return false;
 
   const cacheStat = fs.statSync(CACHE_FILE);
