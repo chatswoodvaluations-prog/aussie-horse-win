@@ -8,6 +8,7 @@ import Nominations from '@/pages/nominations';
 import Races from '@/pages/races';
 import Performance from '@/pages/performance';
 import Settings from '@/pages/settings';
+import Guide from '@/pages/guide';
 import { Shell } from '@/components/shell';
 import {
   Route,
@@ -27,6 +28,7 @@ function Router() {
           <Route path="/races" component={Races} />
           <Route path="/performance" component={Performance} />
           <Route path="/settings" component={Settings} />
+          <Route path="/guide" component={Guide} />
           <Route component={NotFound} />
         </Switch>
       </RoutedErrorBoundary>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Activity, Trophy, Settings as SettingsIcon, Flag, RefreshCw, Menu, X } from 'lucide-react';
+import { Activity, Trophy, Settings as SettingsIcon, Flag, RefreshCw, Menu, X, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTriggerSync } from '@workspace/api-client-react';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/races',       label: 'Race Explorer',  icon: Flag },
   { href: '/performance', label: 'Performance',    icon: Activity },
   { href: '/settings',    label: 'Settings',       icon: SettingsIcon },
+  { href: '/guide',       label: 'User Guide',     icon: BookOpen },
 ];
 
 function Logo() {
