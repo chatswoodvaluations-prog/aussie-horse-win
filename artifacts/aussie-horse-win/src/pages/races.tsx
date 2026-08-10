@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, XCircle, User, MapPin, CheckSquare, Pencil } from 'lucide-react';
+import { CheckCircle2, XCircle, User, MapPin, CheckSquare, Pencil, Wifi, FlaskConical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -91,6 +91,17 @@ function RaceRow({ race, nominationByRunnerId }: { race: Race; nominationByRunne
                 <Badge variant="outline" className="text-[10px] h-5 uppercase px-1.5 font-mono">
                   {race.state}
                 </Badge>
+                {race.dataSource === 'live' ? (
+                  <Badge variant="outline" className="font-mono text-[10px] uppercase bg-blue-500/10 text-blue-400 border-blue-500/30 flex items-center gap-1">
+                    <Wifi className="size-2.5" />
+                    Live TAB odds
+                  </Badge>
+                ) : race.dataSource === 'mock' ? (
+                  <Badge variant="outline" className="font-mono text-[10px] uppercase bg-secondary text-muted-foreground border-border flex items-center gap-1">
+                    <FlaskConical className="size-2.5" />
+                    Simulated
+                  </Badge>
+                ) : null}
               </div>
               <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
                 <span className="font-mono">{race.raceTime || race.raceDate}</span>

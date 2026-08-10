@@ -1,5 +1,5 @@
 import { db, tracksTable, settingsTable, racesTable, runnersTable, nominationsTable, betResultsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { logger } from "./logger";
 import { evaluateRunner, getSettings } from "./selectionEngine";
 
@@ -357,6 +357,34 @@ export async function seed() {
  * Safe to run on every boot against an already-seeded database — it is a
  * no-op when all tracks already exist.
  */
+/**
+ * Back-fill any races whose data_source is NULL to 'mock'.
+ *
+ * This is idempotent — re-running it on a database that already has every row
+ * set to a non-null value is a no-op. It is safe to call on every boot.
+ *
+ * Background: the data_source column was added with DEFAULT 'mock' but without
+ * enforcing NOT NULL on existing rows, so historical records were left as NULL.
+ */
+export async function backfillDataSource(): Promise<void> {
+  const nullRows = await db
+    .select({ id: racesTable.id })
+    .from(racesTable)
+    .where(isNull(racesTable.dataSource));
+
+  if (nullRows.length === 0) {
+    logger.info("backfillDataSource: all races already have data_source set — no-op");
+    return;
+  }
+
+  await db
+    .update(racesTable)
+    .set({ dataSource: "mock" })
+    .where(isNull(racesTable.dataSource));
+
+  logger.info({ count: nullRows.length }, "backfillDataSource: set data_source='mock' on previously-null races");
+}
+
 export async function migrateNewTracks(): Promise<void> {
   const existingTracks = await db.select().from(tracksTable);
 

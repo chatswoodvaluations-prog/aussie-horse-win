@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { db, tracksTable } from "@workspace/db";
-import { seed, migrateNewTracks } from "./lib/seed";
+import { seed, migrateNewTracks, backfillDataSource } from "./lib/seed";
 import { schedule } from "node-cron";
 
 const rawPort = process.env["PORT"];
@@ -50,6 +50,14 @@ async function bootstrap() {
     }
   } catch (err) {
     logger.error({ err }, "Seed error (non-fatal)");
+  }
+
+  // Idempotent back-fill: set data_source='mock' on any races that pre-date
+  // the NOT NULL default (safe to run every boot — no-op when already set).
+  try {
+    await backfillDataSource();
+  } catch (err) {
+    logger.error({ err }, "backfillDataSource error (non-fatal)");
   }
 
   app.listen(port, (err) => {

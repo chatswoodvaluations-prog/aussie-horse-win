@@ -34,6 +34,19 @@ function QualifiedBadge({ count }: { count: number }) {
   );
 }
 
+function DataSourceBadge({ dataSource, colors }: { dataSource: Race['dataSource']; colors: ReturnType<typeof useColors> }) {
+  if (!dataSource) return null;
+  const isLive = dataSource === 'live';
+  return (
+    <View style={[styles.dataSourceBadge, { backgroundColor: isLive ? '#002E11' : colors.muted }]}>
+      <View style={[styles.dataSourceDot, { backgroundColor: isLive ? colors.primary : colors.mutedForeground }]} />
+      <Text style={[styles.dataSourceText, { color: isLive ? colors.primary : colors.mutedForeground }]}>
+        {isLive ? 'Live TAB odds' : 'Simulated'}
+      </Text>
+    </View>
+  );
+}
+
 function RaceCard({ race }: { race: Race }) {
   const colors = useColors();
   const hasSelections = race.qualifiedCount > 0;
@@ -81,6 +94,8 @@ function RaceCard({ race }: { race: Race }) {
           ) : null}
           <MetaItem icon="calendar" value={race.raceDate} colors={colors} />
         </View>
+
+        <DataSourceBadge dataSource={race.dataSource} colors={colors} />
       </View>
 
       <Feather
@@ -304,4 +319,16 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 15, textAlign: 'center' },
   retryBtn: { marginTop: 4, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 6, borderWidth: 1 },
   retryText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
+  dataSourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  dataSourceDot: { width: 6, height: 6, borderRadius: 3 },
+  dataSourceText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
 });
