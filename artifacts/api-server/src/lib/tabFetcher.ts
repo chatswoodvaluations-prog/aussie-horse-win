@@ -21,34 +21,11 @@
  */
 
 import nodeFetch from "node-fetch";
-import { SocksProxyAgent } from "socks-proxy-agent";
 import { logger } from "./logger";
 
-// ── SOCKS5 proxy agent (built once, reused for every TAB request) ────────────
-
-let _agent: SocksProxyAgent | null | undefined = undefined; // undefined = not yet initialised
-
-function getProxyAgent(): SocksProxyAgent | null {
-  if (_agent !== undefined) return _agent;
-
-  const user = process.env.NORDVPN_SOCKS5_USER;
-  const pass = process.env.NORDVPN_SOCKS5_PASS;
-  const host = process.env.NORDVPN_SOCKS5_HOST ?? "au1025.nordvpn.com";
-  const port = process.env.NORDVPN_SOCKS5_PORT ?? "1080";
-
-  if (!user || !pass) {
-    logger.info("TAB proxy: no SOCKS5 credentials found — requests will go direct");
-    _agent = null;
-    return null;
-  }
-
-  // socks5h = DNS resolved by the proxy server, not locally.
-  // Required when the host machine can't resolve AU-only domains.
-  const proxyUrl = `socks5h://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
-  _agent = new SocksProxyAgent(proxyUrl);
-  logger.info({ host, port }, "TAB proxy: SOCKS5 agent initialised");
-  return _agent;
-}
+// No proxy — Oracle server has an AU IP so requests go direct.
+// TAB (api.tab.com.au) fails with DNS ENOTFOUND from datacenter IPs regardless
+// of proxy; Ladbrokes is the primary source when TAB fails.
 
 const TAB_BASE = "https://api.tab.com.au/v1/tab-info-service";
 const FETCH_TIMEOUT_MS = 5_000; // TAB is always blocked from datacenter IPs — fail fast
@@ -209,16 +186,12 @@ async function fetchMeetingsForJurisdiction(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  const agent = getProxyAgent();
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let resp: Awaited<ReturnType<typeof nodeFetch>>;
   try {
     resp = await nodeFetch(url, {
-      // node-fetch accepts signal via cast — AbortSignal is compatible at runtime
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       signal: controller.signal as any,
-      agent: agent ?? undefined,
       headers: {
         Accept: "application/json",
         "User-Agent": "AussieHorseWin/1.0 (+https://github.com/)",
