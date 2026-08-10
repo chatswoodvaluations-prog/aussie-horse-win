@@ -13,6 +13,15 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatRaceDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return `${DAYS[d.getDay()]} ${day} ${MONTHS[month - 1]}`;
+}
+
 export default function RacesExplorer() {
   const { data: races, isLoading: isRacesLoading } = useGetRaces();
   const { data: nominations, isLoading: isNomsLoading } = useGetNominations();
@@ -109,7 +118,7 @@ function RaceRow({ race, nominationByRunnerId }: { race: Race; nominationByRunne
                 ) : null}
               </div>
               <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                <span className="font-mono">{race.raceTime || race.raceDate}</span>
+                <span className="font-mono">{formatRaceDate(race.raceDate)}{race.raceTime ? ` · ${race.raceTime}` : ''}</span>
                 <span>•</span>
                 <span>{race.distance}m</span>
                 <span>•</span>

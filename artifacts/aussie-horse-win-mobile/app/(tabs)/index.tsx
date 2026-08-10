@@ -28,6 +28,15 @@ import {
 } from '@workspace/api-client-react';
 import type { Nomination } from '@workspace/api-client-react';
 
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatRaceDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return `${DAYS[d.getDay()]} ${day} ${MONTHS[month - 1]}`;
+}
+
 type StatusFilter = 'All' | 'Pending' | 'Won' | 'Placed' | 'Unplaced' | 'Cancelled';
 const STATUS_FILTERS: StatusFilter[] = ['All', 'Pending', 'Won', 'Placed', 'Unplaced', 'Cancelled'];
 
@@ -97,7 +106,7 @@ function NominationCard({ item }: { item: Nomination }) {
             {item.horseName}
           </Text>
           <Text style={[styles.raceInfo, { color: colors.mutedForeground }]}>
-            {item.trackName} · R{item.raceNumber} · {item.raceDate}
+            {item.trackName} · R{item.raceNumber} · {formatRaceDate(item.raceDate)}{item.raceTime ? ` · ${item.raceTime}` : ''}
           </Text>
         </View>
         <View style={styles.cardHeaderRight}>

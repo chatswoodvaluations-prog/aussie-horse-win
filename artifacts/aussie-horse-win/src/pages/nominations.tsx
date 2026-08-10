@@ -12,6 +12,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Coins, MapPin, Hash, TrendingUp, AlertCircle, Clock, CheckSquare, Pencil, Wifi, FlaskConical, ChevronDown, ChevronUp, PlayCircle, Share2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatRaceDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return `${DAYS[d.getDay()]} ${day} ${MONTHS[month - 1]}`;
+}
+
 const LEGACY_HOW_IT_WORKS_KEY = 'ahw_how_it_works_seen';
 
 const VIDEO_URL = import.meta.env.VITE_VIDEO_URL as string | undefined;
@@ -406,9 +415,9 @@ function NominationCard({ nom }: { nom: Nomination }) {
               </div>
               <CardTitle className="text-lg mt-1 font-bold">R{nom.raceNumber}: {nom.horseName}</CardTitle>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-muted-foreground font-mono mb-1">{nom.raceDate.split('T')[0]}</div>
-              {nom.raceTime && <div className="text-xs font-mono">{nom.raceTime}</div>}
+            <div className="text-right leading-tight">
+              <div className="text-xs text-muted-foreground font-mono">{formatRaceDate(nom.raceDate)}</div>
+              {nom.raceTime && <div className="text-xs font-mono font-semibold mt-0.5">{nom.raceTime}</div>}
             </div>
           </div>
         </div>
