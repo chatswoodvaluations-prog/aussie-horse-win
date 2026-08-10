@@ -157,7 +157,7 @@ function StatCard({ title, value, icon: Icon, trend, valueColor = "text-foregrou
       </div>
       <CardContent className="p-6 relative z-10">
         <p className="text-sm font-medium text-muted-foreground mb-1 font-mono uppercase tracking-wider">{title}</p>
-        <div className={cn("text-3xl font-bold tracking-tight font-mono mb-2", valueColor)}>
+        <div className={cn("text-2xl sm:text-3xl font-bold tracking-tight font-mono mb-2 truncate", valueColor)}>
           {value}
         </div>
         {trend && (

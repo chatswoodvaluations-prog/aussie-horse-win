@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { href: '/races',       label: 'Race Explorer',  icon: Flag },
   { href: '/performance', label: 'Performance',    icon: Activity },
   { href: '/settings',    label: 'Settings',       icon: SettingsIcon },
-  { href: '/guide',       label: 'User Guide',     icon: BookOpen },
+  { href: '/guide',       label: 'Guide',          icon: BookOpen },
 ];
 
 function Logo() {
