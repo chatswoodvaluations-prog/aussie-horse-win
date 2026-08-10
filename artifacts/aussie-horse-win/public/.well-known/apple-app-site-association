@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["XXXXXXXXXX.com.aussiehorsewin.mobile"],
+        "components": [
+          {
+            "/": "/race/*",
+            "comment": "Opens the race detail screen in the Aussie Horse Win app"
+          }
+        ]
+      }
+    ]
+  }
+}

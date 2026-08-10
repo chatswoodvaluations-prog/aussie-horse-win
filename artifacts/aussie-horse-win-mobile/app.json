@@ -14,9 +14,27 @@
       "backgroundColor": "#060D1F"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.aussiehorsewin.mobile",
+      "associatedDomains": ["applinks:aussie-horse-win.replit.app"]
     },
-    "android": {},
+    "android": {
+      "package": "com.aussiehorsewin.mobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "aussie-horse-win.replit.app",
+              "pathPrefix": "/race"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -24,7 +42,7 @@
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://aussie-horse-win.replit.app/"
         }
       ],
       "expo-font",

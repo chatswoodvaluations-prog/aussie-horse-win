@@ -22,7 +22,6 @@ import { useGetRace, useRecordResult, getGetRaceQueryKey } from '@workspace/api-
 import type { Race, NominationDataSource } from '@workspace/api-client-react';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import * as Haptics from 'expo-haptics';
-import * as Linking from 'expo-linking';
 
 type Runner = Race['runners'][number];
 
@@ -302,7 +301,7 @@ function SettleModal({
 }
 
 function shareRunner(runner: Runner, race: Race) {
-  const deepLink = Linking.createURL(`race/${race.id}`);
+  const webUrl = `https://aussie-horse-win.replit.app/race/${race.id}`;
   const message =
     `🏇 ${runner.horseName}\n` +
     `📍 ${race.trackName} · Race ${race.raceNumber}` +
@@ -310,7 +309,7 @@ function shareRunner(runner: Runner, race: Race) {
     `Win $${runner.winOdds.toFixed(1)} · Place $${runner.placeOdds.toFixed(1)}\n` +
     `Barrier ${runner.barrierNumber}` +
     (race.distance ? ` · ${race.distance}m` : '') + '\n' +
-    `— Aussie Horse Win\n${deepLink}`;
+    `— Aussie Horse Win\n${webUrl}`;
   Share.share({ message });
 }
 
