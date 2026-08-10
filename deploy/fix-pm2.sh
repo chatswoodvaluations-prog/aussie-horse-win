@@ -31,8 +31,6 @@ module.exports = {
       PORT: 8080,
       DATABASE_URL: '${DATABASE_URL}',
       SESSION_SECRET: '${SESSION_SECRET}',
-      NORDVPN_SOCKS5_USER: '${NORDVPN_SOCKS5_USER}',
-      NORDVPN_SOCKS5_PASS: '${NORDVPN_SOCKS5_PASS}',
     }
   }]
 };
