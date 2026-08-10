@@ -280,10 +280,15 @@ function NominationCard({ nom }: { nom: Nomination }) {
               <Badge variant="outline" className={cn("font-mono text-[10px] uppercase", statusColor)}>
                 {nom.status}
               </Badge>
-              {nom.dataSource === 'live' ? (
+              {nom.dataSource === 'ladbrokes' ? (
                 <Badge variant="outline" className="font-mono text-[10px] uppercase bg-blue-500/10 text-blue-400 border-blue-500/30 flex items-center gap-1">
                   <Wifi className="size-2.5" />
-                  Live TAB odds
+                  Ladbrokes live
+                </Badge>
+              ) : nom.dataSource === 'live' ? (
+                <Badge variant="outline" className="font-mono text-[10px] uppercase bg-blue-500/10 text-blue-400 border-blue-500/30 flex items-center gap-1">
+                  <Wifi className="size-2.5" />
+                  Live odds
                 </Badge>
               ) : nom.dataSource === 'mock' ? (
                 <Badge variant="outline" className="font-mono text-[10px] uppercase bg-secondary text-muted-foreground border-border flex items-center gap-1">
