@@ -61,7 +61,7 @@ else
 fi
 
 echo ""
-echo "Triggering first data sync from TAB (this takes ~60 seconds)..."
+echo "Triggering first data sync from Ladbrokes (this takes ~60 seconds)..."
 curl -s -X POST http://localhost:8080/api/sync &
 echo "Sync started in background. Check pm2 logs ahw-api in 60 seconds."
 echo ""
