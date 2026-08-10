@@ -226,7 +226,7 @@ export default function PerformanceDashboard() {
           <PopoverContent className="w-64 p-2" align="start">
             <div className="text-xs font-mono text-muted-foreground uppercase mb-2 px-2 pt-1">Select tracks</div>
             {allTracks.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-2 py-4">No track data available.</p>
+              <p className="text-xs text-muted-foreground px-2 py-4">No settled results yet — mark nominations as Won, Placed or Unplaced first.</p>
             ) : (
               <div className="max-h-64 overflow-y-auto space-y-1">
                 {allTracks.map((track) => (
@@ -293,6 +293,15 @@ export default function PerformanceDashboard() {
           <KpiCard title="Avg Place Odds" value={`$${perf.avgOddsPlace.toFixed(2)}`} />
           <KpiCard title="Best Streak" value={`${perf.longestWinStreak} Wins`} valueColor="text-primary" />
           <KpiCard title="Worst Streak" value={`${perf.longestLosingStreak} Losses`} valueColor="text-destructive" />
+        </div>
+      ) : !isHistoryLoading && !history?.length ? (
+        <div className="rounded-xl border border-dashed border-border bg-card/40 p-8 text-center space-y-2">
+          <p className="text-foreground font-medium">No settled results recorded yet</p>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            The Performance page tracks races you've manually settled. Go to{' '}
+            <strong>Nominations</strong>, open any card, press <strong>Edit</strong>, and mark it
+            Won, Placed, or Unplaced — your stats will appear here automatically.
+          </p>
         </div>
       ) : (
         <div className="h-24 flex items-center justify-center text-muted-foreground text-sm border border-dashed border-border rounded-xl">
